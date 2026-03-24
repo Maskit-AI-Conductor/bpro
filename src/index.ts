@@ -14,6 +14,7 @@ import { auditCommand } from './commands/audit.js';
 import { agentCommand } from './commands/agent.js';
 import { statusCommand } from './commands/status.js';
 import { reportCommand } from './commands/report.js';
+import { setupCommand } from './commands/setup-cmd.js';
 
 const program = new Command();
 
@@ -31,6 +32,7 @@ program.addCommand(auditCommand);
 program.addCommand(agentCommand);
 program.addCommand(statusCommand);
 program.addCommand(reportCommand);
+program.addCommand(setupCommand);
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);

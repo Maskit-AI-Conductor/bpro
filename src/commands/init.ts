@@ -1,5 +1,5 @@
 /**
- * bpro init — Initialize project.
+ * bpro init — Initialize project + auto-setup models & conductor.
  */
 
 import path from 'node:path';
@@ -7,11 +7,13 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { findProjectRoot, initProject } from '../core/project.js';
 import { printSuccess, printWarning, printError } from '../utils/display.js';
+import { runSetup } from './setup.js';
 
 export const initCommand = new Command('init')
   .description('Initialize bpro in the current directory')
   .option('--force', 'Reinitialize existing .bpro/')
-  .action(async (opts: { force?: boolean }) => {
+  .option('--skip-setup', 'Skip model detection and conductor selection')
+  .action(async (opts: { force?: boolean; skipSetup?: boolean }) => {
     const root = process.cwd();
 
     if (findProjectRoot(root) && !opts.force) {
@@ -27,11 +29,24 @@ export const initCommand = new Command('init')
     }
 
     printSuccess(`Initialized .bpro/ in ${path.basename(root)}/`);
-    console.log();
-    console.log('  Next steps:');
-    console.log(`  ${chalk.cyan('bpro model add ollama:qwen2.5:7b')}       — register a model`);
-    console.log(`  ${chalk.cyan('bpro config set conductor <model>')}      — pick conductor`);
-    console.log(`  ${chalk.cyan('bpro snapshot')}                          — reverse-engineer code`);
-    console.log(`  ${chalk.cyan('bpro plan import ./planning-doc.md')}     — start from plan`);
-    console.log();
+
+    if (!opts.skipSetup) {
+      try {
+        await runSetup(path.join(root, '.bpro'));
+      } catch (err: unknown) {
+        if ((err as { name?: string })?.name === 'ExitPromptError') {
+          // User cancelled setup — that's fine
+          console.log();
+          printWarning('Setup skipped. Run `bpro setup` later.');
+          return;
+        }
+        // Non-fatal — init succeeded, setup failed
+        printWarning('Model setup failed. Run `bpro setup` to try again.');
+      }
+    } else {
+      console.log();
+      console.log('  Next:');
+      console.log(`  ${chalk.cyan('bpro setup')}  — detect models and pick conductor`);
+      console.log();
+    }
   });
