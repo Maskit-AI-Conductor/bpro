@@ -1,18 +1,20 @@
 # bpro
 
-**Beyond Prototype.** Your AI-powered PMO that turns side projects into production-grade software.
+**Beyond Prototype.** Conductor-based AI PMO that turns side projects into production-grade software.
 
-> bpro reverse-engineers your codebase into requirements, tests, and E2E traceability — or decomposes your planning doc into trackable REQ IDs. Then it governs your AI agents with audit trails. All from your terminal.
+> bpro is a **protocol layer** — it manages agent roles, manuals, and logs. Actual execution runs through the models you choose: Claude, GPT, Gemini, Ollama, or any OpenAI-compatible endpoint.
 
 ```bash
-pip install bpro-cli   # coming soon
+npm install -g bpro-cli   # coming soon
+# or
+npx bpro-cli
 ```
 
 ---
 
 ## What is bpro?
 
-bpro sits **between your code editor and your project board**. It doesn't write code — it makes sure the code you (or your AI agents) wrote is production-ready.
+bpro sits **between your code editor and your project board**. It doesn't write code — it orchestrates AI agents to analyze, audit, and govern your project.
 
 ```
 Your AI tools:
@@ -23,18 +25,46 @@ Your AI tools:
        +-------+-------+------+------+------+-------+
                |
          +-----v-----+
-         |   bpro    |  <-- sits underneath, like git
-         | (PMO/audit)|      works with any AI tool
+         |   bpro    |  <-- conductor-based orchestration
+         | (PMO/audit)|      model-agnostic, any LLM/SLM
          +-----------+
 ```
 
-**bpro is not an AI.** It's the manager of your AIs.
+### Core Architecture
+
+1. **Model Registry** — register any model you have access to
+2. **Conductor** — pick your orchestrator model (the "maestro")
+3. **AIOps** — automatic model assignment per agent role
+4. **Agents** — auto-generated from project analysis, with logs and evaluation
 
 ---
 
-## Daily Usage (How our team actually uses it)
+## Quick Start
 
-We're a 6-person startup running 15+ AI agent roles. Here's how we use bpro every day.
+```bash
+# 1. Initialize
+cd my-project
+bpro init
+
+# 2. Register models
+bpro model add ollama:qwen2.5:7b --endpoint http://localhost:11434
+bpro model add claude-opus --api-key sk-xxx
+bpro model add gemini-pro --api-key xxx
+
+# 3. Pick conductor
+bpro config set conductor claude-opus
+
+# 4. Reverse-engineer (or import plan)
+bpro snapshot          # code -> agents -> REQs
+# or
+bpro plan import ./planning-doc.md
+bpro plan decompose
+bpro plan confirm
+```
+
+---
+
+## Daily Usage
 
 ### Morning Check: "Where are we?"
 
@@ -42,46 +72,49 @@ We're a 6-person startup running 15+ AI agent roles. Here's how we use bpro ever
 $ bpro status
   ■■■■■■■░░░░░░░  12/38 REQs done (32%)
 
-  REQ-001 [DONE]  사용자 로그인           tests: 8/8 PASS
-  REQ-002 [DONE]  비밀번호 재설정          tests: 7/7 PASS
-  REQ-012 [DEV]   결제 프로세스           tests: 3/5 FAIL
-  REQ-013 [TODO]  환불 정책              tests: --
-  ...
+  DONE: 12 | DEV: 5 | CONFIRMED: 18 | DRAFT: 3
 
-  Agents: auditor 3 runs, tester 5 runs this week
-  Cost: $0.00 (SLM 100%)
+  Code mapped: 17/38 | Tests mapped: 12/38
 
 $ bpro status --deliverables
-  D.01 Planning Doc        DONE   imported
-  D.02 Requirements        DONE   38 REQs confirmed
-  D.03 Traceability Matrix  WIP    12/38 mapped
-  D.05 Implementation       WIP    12/38 done
-  D.06 Tests               WARN   8/38 pass, 4 fail
-  D.07 Audit Report         --    gate not run yet
-  ─────────────────────────────────
-  Gate: run after D.06 complete
+  D.01 Planning Doc        ✓ imported
+  D.02 Requirements        ✓ 38 confirmed
+  D.03 Traceability Matrix ◉ 17/38 mapped
+  D.05 Implementation      ◉ 12/38 done
+  D.06 Tests               △ 12/38 pass
+  D.07 Audit Report        ○ gate not run
 ```
 
 ### After Coding: "Did I break anything?"
 
 ```bash
-$ bpro audit
-  REQ-012: code changed, test not updated [WARN]
-  REQ-025: new code detected, no REQ mapped [NEW]
-  REQ-005: planning doc changed, code STALE [STALE]
+$ bpro audit --gate
+  PASS  REQ-001: User login
+  WARN  REQ-012: Payment — no tests
+  TODO  REQ-025: New code detected, no REQ mapped
   ─────────────────────────────────
-  Gate: CONDITIONAL PASS (3 issues)
+  Gate: CONDITIONAL PASS (2 issues)
 ```
 
-### Weekly Review: "Report for the team"
+### Check Agent Performance
+
+```bash
+$ bpro agent list
+  conductor              architect     claude-opus          3 runs
+  Auth Analyst           domain-analyst ollama:qwen2.5:7b   12 runs
+  Payment Auditor        auditor       gemini-pro           5 runs
+
+$ bpro agent eval
+  conductor    runs: 3  success: 100%  failures: 0
+  Auth Analyst runs: 12 success: 92%   failures: 1
+```
+
+### Weekly Report
 
 ```bash
 $ bpro report
   -> .bpro/reports/2026-03-24-progress.html generated
-  -> Open in browser? [Y/n]
 ```
-
-The HTML report shows progress, test results, and change history. Share it with your planner — they don't need to install bpro.
 
 ---
 
@@ -89,133 +122,25 @@ The HTML report shows progress, test results, and change history. Share it with 
 
 ### Path 1: Reverse — You already have code
 
-Your side project has been running for weeks. No docs, no tests, no requirements. Classic.
-
 ```bash
-$ cd my-side-project
 $ bpro init
-# .bpro/ created. Watching for changes. That's it.
-
+$ bpro model add ollama:qwen2.5:7b
+$ bpro config set conductor ollama:qwen2.5:7b
 $ bpro snapshot
-# Scanning codebase with SLM...
-# -> 23 requirements extracted (code -> REQ reverse-trace)
-# -> 15 test outlines generated (coverage gaps marked)
-# -> E2E traceability matrix created (REQ <-> code <-> test)
-# -> Saved to .bpro/specs/, .bpro/tests/, .bpro/matrix/
-
-$ bpro audit --quick
-#  PASS  15 | WARN  5 | NEW  3
+# Conductor analyzes project structure
+# AIOps assigns models to agent roles
+# Domain analysts extract requirements per domain
+# Auditor cross-validates
+# -> REQs + matrix + agent definitions saved to .bpro/
 ```
 
-### Path 2: Forward — You have a planning doc first
-
-Your planner wrote a spec in Notion or Markdown. Now you want to track it properly.
+### Path 2: Forward — You have a planning doc
 
 ```bash
 $ bpro init
 $ bpro plan import ./planning-doc.md
-
-$ bpro plan decompose
-# -> REQ-001: User login [HIGH]
-# -> REQ-002: Password reset [MEDIUM]
-# -> REQ-003: Profile edit [LOW]
-# -> ... 38 REQs extracted. Waiting for planner confirmation.
-
-# Planner reviews and confirms
-$ bpro plan confirm
-# -> 38 REQs locked. Development phase started.
-# -> Empty traceability matrix created.
-
-# Developer works, bpro tracks
-$ bpro audit
-# -> REQ-001: code mapped, no test yet [WARN]
-# -> REQ-015: not implemented [TODO]
-```
-
-Both paths converge into the **same deliverable tree** (see below).
-
----
-
-## Change Management
-
-Requirements change. That's life. bpro tracks every change and shows the impact.
-
-```bash
-# Planner updated the spec? Diff it.
-$ bpro plan diff ./planning-doc-v2.md
-  + REQ-039: Social login (new)
-  ~ REQ-005: Password policy (changed)
-  - REQ-012: Email verification (removed)
-  -> Apply changes? [Y/n]
-
-$ bpro plan apply
-# -> D.02 updated (38 -> 39 REQs)
-# -> D.03 matrix: 3 rows marked STALE
-# -> Change log: CHG-001~003 recorded
-
-# Check impact of a specific change
-$ bpro plan impact REQ-005
-#  Code:  src/auth/password.ts (L42-68) — needs update
-#  Tests: tests/auth/password.test.ts — needs rewrite
-#  Related: REQ-001 (login) — indirect impact
-
-# View full change history
-$ bpro changelog
-  CHG-001 [03-24] REQ-039 added — "Social login"
-  CHG-002 [03-25] REQ-005 modified — password policy change
-  CHG-003 [03-25] REQ-012 deprecated — scope reduction
-```
-
----
-
-## Agent Governance
-
-If you use AI agents (Claude Code, Cursor agents, custom agents), bpro tracks what they do.
-
-**The most important lesson we learned: defining what an agent must NOT do is more important than defining what it should do.**
-
-```bash
-# Define an agent with scope, manual, and boundaries
-$ bpro agent define auditor \
-    --scope "Code quality audit" \
-    --manual ./manuals/auditor.md \
-    --boundaries "Read only. No code modifications." \
-    --never "Direct DB access, PASS without tests"
-
-# Check agent work logs
-$ bpro agent log auditor
-  [03-24] Audit complete: 35/38 PASS, 3 WARN
-  [03-24] Performance: coverage 83% -> 91% recommendation
-  [03-24] Unresolved: REQ-012 no tests
-
-# Evaluate agent performance
-$ bpro agent eval
-  auditor: log rate 100%, human feedback 4.2/5
-  tester:  log rate 85%,  human feedback 3.8/5
-```
-
----
-
-## Deliverable Tree
-
-Every project managed by bpro follows this structure. **No skipping ahead — earlier deliverables must be completed before later ones.**
-
-```
-D.01 Planning Doc (plan import) or Reverse-engineered snapshot
-  |
-D.02 Requirements (REQ IDs - decompose or snapshot result)
-  |  <- plan confirm or snapshot complete
-D.03 Traceability Matrix (REQ <-> code <-> test, auto-generated)
-  |
-  +-> D.04 Design Doc (optional, auto-generated by snapshot)
-  |
-  +-> D.05 Implementation (developer work, REQ mapping auto-tracked)
-  |
-  +-> D.06 Tests + Results (test generate -> test run)
-  |
-  +-> D.07 Audit Report (audit --gate -> PASS/CONDITIONAL/FAIL)
-  |
-  +-> D.08 Progress Report (report -> HTML for planners/team)
+$ bpro plan decompose    # conductor extracts REQ IDs
+$ bpro plan confirm      # lock REQs, start dev phase
 ```
 
 ---
@@ -224,34 +149,42 @@ D.03 Traceability Matrix (REQ <-> code <-> test, auto-generated)
 
 ```
 bpro
-+-- init                        # Start watching project
-+-- snapshot                    # [Reverse] Code -> REQ/tests/matrix
-+-- plan                        # [Forward] Planning doc workflow
-|   +-- import <file>           # Import planning doc
-|   +-- decompose               # Extract REQ IDs (SLM)
-|   +-- confirm                 # Lock REQs, start dev phase
-|   +-- add <req-id> <desc>     # Add REQ (change mgmt)
-|   +-- modify <req-id>         # Modify REQ (impact analysis)
-|   +-- deprecate <req-id>      # Deprecate REQ
-|   +-- diff <file>             # Compare with updated doc
-|   +-- apply                   # Apply changes
-|   +-- impact <req-id>         # Impact analysis
-+-- audit [--quick|--gate]      # Run audit (gap detection, gate)
-+-- test
-|   +-- generate                # Auto-generate tests per REQ
-|   +-- run                     # Run all tests
-+-- report                      # Generate HTML progress report
-+-- changelog                   # View change history
-+-- agent
-|   +-- define <name>           # Define agent scope/manual/boundaries
-|   +-- log <name>              # View agent work log
-|   +-- eval                    # Evaluate agent performance
-|   +-- list                    # List defined agents
-+-- status [--deliverables]     # Project overview
-+-- model
-|   +-- config                  # Model routing (SLM/LLM)
-+-- config                      # Global settings
+├── init                          # Initialize .bpro/ in current directory
+├── model
+│   ├── add <name> [--endpoint] [--api-key]  # Register model
+│   ├── list                      # List registered models
+│   └── remove <name>             # Remove model
+├── config
+│   ├── set conductor <model>     # Pick conductor model
+│   └── show                      # Show current configuration
+├── snapshot                      # Reverse-engineer (conductor -> agents -> REQs)
+├── plan
+│   ├── import <file>             # Import planning document
+│   ├── decompose                 # Extract REQ IDs (conductor)
+│   └── confirm                   # Confirm REQs, start dev phase
+├── audit [--quick] [--gate]      # Run audit (gap detection, gate)
+├── agent
+│   ├── list                      # List agents with stats
+│   ├── log <name>                # View agent work log
+│   └── eval                      # Evaluate agent performance
+├── status [--deliverables]       # Project overview
+└── report                        # Generate HTML report
 ```
+
+---
+
+## Model Adapters
+
+bpro supports any model through adapters:
+
+| Provider | Endpoint | Auth |
+|----------|----------|------|
+| **Ollama** | `http://localhost:11434` | None (local) |
+| **Anthropic** (Claude) | `api.anthropic.com` | `ANTHROPIC_API_KEY` or `--api-key` |
+| **OpenAI** (GPT) | `api.openai.com` | `OPENAI_API_KEY` or `--api-key` |
+| **Gemini** | `generativelanguage.googleapis.com` | `GOOGLE_API_KEY` or `--api-key` |
+
+API keys resolve in order: `--api-key` flag > environment variable > stored in models.yaml.
 
 ---
 
@@ -259,34 +192,89 @@ bpro
 
 ```
 .bpro/
-  config.yaml       # Project settings (model, scan scope)
-  specs/             # D.02 Requirements (REQ-001.md, ...)
-  matrix/            # D.03 Traceability matrix
-  tests/             # D.06 Test docs + results
-  agents/            # Agent definitions (auditor.md, ...)
-  logs/              # Agent work-logs, daily-logs
-  reports/           # D.08 HTML reports
-  models/            # Model routing config
-  changes/           # Change history (CHG-001.md, ...)
-  .gitignore         # Auto-generated, protects credentials
+  config.yaml       # Project settings + conductor
+  models.yaml       # Registered models (gitignored — contains keys)
+  specs/            # REQ definitions (REQ-001.yaml, ...)
+  matrix/           # Traceability matrix (REQ <-> code <-> test)
+  tests/            # Test documents
+  agents/           # Agent definitions (auto-generated by snapshot)
+  logs/             # Agent work logs (JSONL)
+  reports/          # Audit + progress reports
+  plans/            # Imported planning documents
+  changes/          # Change history
+  .gitignore        # Protects credentials
+```
+
+---
+
+## Snapshot Workflow (Core)
+
+```
+bpro snapshot
+  │
+  ├─ 1. Conductor analyzes project
+  │     - File structure + source code -> domains + architecture
+  │     - Generates agent roles (architect, domain-analyst, auditor)
+  │
+  ├─ 2. AIOps assigns models (rule-based)
+  │     - Architect -> strongest model
+  │     - Domain analyst -> SLM (cost optimization)
+  │     - Auditor -> different model (cross-validation)
+  │
+  ├─ 3. Domain analysts extract requirements
+  │     - Each domain analyzed by assigned model
+  │     - REQs extracted per domain
+  │
+  └─ 4. Results saved to .bpro/
+        - specs/REQ-001.yaml ~ REQ-NNN.yaml
+        - matrix/matrix.yaml
+        - agents/*.yaml
+        - logs/*.jsonl
 ```
 
 ---
 
 ## Design Principles
 
-1. **Never interrupt Phase 1.** Developers prototype freely. bpro only kicks in when they ask.
-2. **Model-agnostic.** Works with Claude, GPT, Gemini, Ollama, or no AI at all.
-3. **SLM-first.** Default model is local SLM (Ollama). LLM is fallback for complex reasoning.
-4. **File-based.** No database dependency. Everything in `.bpro/`, trackable with git.
-5. **Define what NOT to do.** Agent `--never` flags are more important than `--scope`.
-6. **No deliverable skipping.** Gate rules enforce production quality step by step.
+1. **Protocol layer, not execution.** bpro manages roles/manuals/logs. Models do the work.
+2. **Model-agnostic.** Works with any LLM/SLM. Switch conductors anytime.
+3. **SLM-first.** AIOps assigns lightweight tasks to local models. LLM for reasoning.
+4. **File-based.** No database. Everything in `.bpro/`, trackable with git.
+5. **Conductor pattern.** One model orchestrates, others execute. Like an orchestra.
+6. **Observable.** Every agent action is logged. Evaluate performance anytime.
+
+---
+
+## Development
+
+```bash
+# Build from source
+git clone https://github.com/Maskit-AI-Conductor/bpro.git
+cd bpro
+npm install
+npm run build
+
+# Run locally
+node dist/index.js --help
+
+# Development mode (watch)
+npm run dev
+```
+
+### Tech Stack
+
+- **Node.js 18+** (LTS)
+- **TypeScript** (strict mode)
+- **Commander.js** — CLI framework
+- **chalk + ora** — terminal UI
+- **js-yaml** — YAML read/write
+- **@inquirer/prompts** — interactive prompts
 
 ---
 
 ## Built by
 
-[Maskit](https://maskit.co.kr) — a 6-person B2B SaaS startup that runs 15+ AI agent roles in production. bpro is extracted from our internal PMO system that tracks 2,375 requirements across 11 domains with 3-layer audit governance.
+[Maskit](https://maskit.co.kr) — a 6-person B2B SaaS startup running 15+ AI agent roles in production. bpro is extracted from our internal PMO system.
 
 ---
 

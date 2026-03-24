@@ -8,7 +8,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-dist/
 build/
 *.egg
 .venv/
@@ -16,7 +15,10 @@ venv/
 
 # Node
 node_modules/
+dist/
 npm-debug.log*
+yarn-error.log
+*.tsbuildinfo
 
 # OS
 .DS_Store
