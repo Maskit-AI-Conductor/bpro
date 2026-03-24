@@ -25,6 +25,7 @@ export interface BproConfig {
   version: number;
   project_name: string;
   conductor?: string;
+  conductor_name?: string;
   scan: {
     include: string[];
     exclude: string[];

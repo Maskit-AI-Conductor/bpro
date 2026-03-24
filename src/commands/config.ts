@@ -54,6 +54,16 @@ configCommand
           printSuccess(`Conductor set to '${selectedModel}' (${model.provider})`);
           break;
         }
+        case 'conductor-name': {
+          if (!value) {
+            const { input } = await import('@inquirer/prompts');
+            value = await input({ message: 'Name for your conductor (e.g. maestro, 마에스트로):' });
+          }
+          config.conductor_name = value;
+          saveConfig(bproDir, config);
+          printSuccess(`Conductor named '${value}'. Call with @${value}`);
+          break;
+        }
         default:
           if (!value) {
             printError(`Usage: bpro config set ${key} <value>`);
