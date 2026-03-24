@@ -12,6 +12,7 @@ export const MODELS_FILE = 'models.yaml';
 
 export const SUBDIRS = [
   'specs',
+  'staging',
   'matrix',
   'tests',
   'agents',
@@ -255,4 +256,149 @@ export function saveMatrix(bproPath: string, matrix: TraceMatrix): void {
   const matrixDir = path.join(bproPath, 'matrix');
   fs.mkdirSync(matrixDir, { recursive: true });
   saveYaml(path.join(matrixDir, 'matrix.yaml'), matrix);
+}
+
+// --- Staging ---
+
+export interface StagingMeta {
+  timestamp: string;
+  conductor: string;
+  model_assignments: Array<{ agent: string; model: string }>;
+  total_reqs: number;
+}
+
+export function getStagingDir(bproPath: string): string {
+  return path.join(bproPath, 'staging');
+}
+
+export function hasStagingData(bproPath: string): boolean {
+  const stagingDir = getStagingDir(bproPath);
+  const metaFile = path.join(stagingDir, '_meta.yaml');
+  return fs.existsSync(metaFile);
+}
+
+export function saveStagingSpec(bproPath: string, req: ReqSpec): void {
+  const stagingDir = getStagingDir(bproPath);
+  fs.mkdirSync(stagingDir, { recursive: true });
+  saveYaml(path.join(stagingDir, `${req.id}.yaml`), req);
+}
+
+export function saveStagingMeta(bproPath: string, meta: StagingMeta): void {
+  const stagingDir = getStagingDir(bproPath);
+  fs.mkdirSync(stagingDir, { recursive: true });
+  saveYaml(path.join(stagingDir, '_meta.yaml'), meta);
+}
+
+export function loadStagingSpecs(bproPath: string): ReqSpec[] {
+  const stagingDir = getStagingDir(bproPath);
+  if (!fs.existsSync(stagingDir)) return [];
+
+  const files = fs.readdirSync(stagingDir)
+    .filter((f) => f.startsWith('REQ-') && f.endsWith('.yaml'))
+    .sort();
+
+  const specs: ReqSpec[] = [];
+  for (const file of files) {
+    const spec = loadYaml<ReqSpec>(path.join(stagingDir, file));
+    if (spec) specs.push(spec);
+  }
+  return specs;
+}
+
+export function loadStagingMeta(bproPath: string): StagingMeta | null {
+  const stagingDir = getStagingDir(bproPath);
+  return loadYaml<StagingMeta>(path.join(stagingDir, '_meta.yaml'));
+}
+
+export function clearStaging(bproPath: string): void {
+  const stagingDir = getStagingDir(bproPath);
+  if (fs.existsSync(stagingDir)) {
+    const files = fs.readdirSync(stagingDir);
+    for (const file of files) {
+      fs.unlinkSync(path.join(stagingDir, file));
+    }
+  }
+}
+
+export function deleteSpec(bproPath: string, reqId: string): void {
+  const specFile = path.join(bproPath, 'specs', `${reqId}.yaml`);
+  if (fs.existsSync(specFile)) {
+    fs.unlinkSync(specFile);
+  }
+}
+
+export type DiffStatus = 'NEW' | 'CHANGED' | 'SAME' | 'REMOVED' | 'PROTECTED';
+
+export interface DiffEntry {
+  id: string;
+  status: DiffStatus;
+  title: string;
+  stagingSpec?: ReqSpec;
+  existingSpec?: ReqSpec;
+  changes?: string[];  // list of changed fields
+}
+
+const PROTECTED_STATUSES = ['CONFIRMED', 'DEV', 'DONE'];
+
+export function diffStagingVsSpecs(bproPath: string): DiffEntry[] {
+  const staging = loadStagingSpecs(bproPath);
+  const existing = loadSpecs(bproPath);
+
+  const existingMap = new Map(existing.map((s) => [s.id, s]));
+  const stagingMap = new Map(staging.map((s) => [s.id, s]));
+
+  const entries: DiffEntry[] = [];
+
+  // Check staging items (NEW or CHANGED or SAME)
+  for (const stg of staging) {
+    const ext = existingMap.get(stg.id);
+    if (!ext) {
+      entries.push({ id: stg.id, status: 'NEW', title: stg.title, stagingSpec: stg });
+    } else if (PROTECTED_STATUSES.includes(ext.status)) {
+      entries.push({
+        id: stg.id,
+        status: 'PROTECTED',
+        title: ext.title,
+        stagingSpec: stg,
+        existingSpec: ext,
+      });
+    } else {
+      const changes: string[] = [];
+      if (stg.title !== ext.title) changes.push('title');
+      if (stg.description !== ext.description) changes.push('description');
+      if (stg.priority !== ext.priority) changes.push('priority');
+      if (changes.length > 0) {
+        entries.push({
+          id: stg.id,
+          status: 'CHANGED',
+          title: stg.title,
+          stagingSpec: stg,
+          existingSpec: ext,
+          changes,
+        });
+      } else {
+        entries.push({ id: stg.id, status: 'SAME', title: stg.title, stagingSpec: stg, existingSpec: ext });
+      }
+    }
+  }
+
+  // Check existing items not in staging (REMOVED or PROTECTED)
+  for (const ext of existing) {
+    if (!stagingMap.has(ext.id)) {
+      if (PROTECTED_STATUSES.includes(ext.status)) {
+        entries.push({
+          id: ext.id,
+          status: 'PROTECTED',
+          title: ext.title,
+          existingSpec: ext,
+        });
+      } else {
+        entries.push({ id: ext.id, status: 'REMOVED', title: ext.title, existingSpec: ext });
+      }
+    }
+  }
+
+  // Sort by ID
+  entries.sort((a, b) => a.id.localeCompare(b.id));
+  return entries;
 }
