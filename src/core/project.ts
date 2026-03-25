@@ -21,6 +21,7 @@ export const SUBDIRS = [
   'plans',
   'changes',
   'tasks',
+  'workflows',
 ];
 
 export interface FugueConfig {

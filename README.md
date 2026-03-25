@@ -145,7 +145,59 @@ fugue
 ├── agent list/log/eval         # Agent governance
 ├── status [--deliverables]     # Project overview
 ├── report                      # HTML progress report
-└── notify add/list/remove/test # Notification plugins (Slack)
+├── notify add/list/remove/test # Notification plugins (Slack)
+├── diagnose                    # T-shirt Sizing (XS~XL) + methodology
+├── gate [--phase N]            # Phase Gate scoring (100-point)
+├── deliver [task-id]           # Formal delivery judgment + report
+├── workflow run/list/show/define  # Repeatable multi-step workflows
+└── admin overview/usage/register  # Cross-project monitoring
+```
+
+---
+
+## Workflows
+
+Repeatable patterns with human checkpoints:
+
+```bash
+# New feature (7 steps: auto → gate → gate → manual → manual → gate → auto)
+fugue workflow run feature ./spec.md --requester PM-Kim
+
+# Bug fix (lighter process)
+fugue workflow run bugfix ./bug-report.md --requester QA
+
+# Reverse-engineer existing code
+fugue workflow run reverse
+
+# Regular audit
+fugue workflow run review
+
+# Define custom workflow
+fugue workflow define my-process
+```
+
+Step types: `auto` (runs and continues), `gate` (pauses for review), `manual` (waits for human).
+
+```bash
+$ fugue workflow show feature
+  1. new+import     [auto]    Create task and import planning doc
+  2. validate       [gate]    Validate planning doc quality
+  3. decompose      [gate]    Decompose into REQ IDs
+  4. confirm        [manual]  Requester confirms REQs
+  5. assign         [manual]  Assign worker(s)
+  6. done           [gate]    Auto-verify REQs
+  7. deliver        [auto]    Generate delivery report
+```
+
+---
+
+## Project Lifecycle
+
+```bash
+fugue diagnose              # Size: M (medium). Crosscheck required.
+fugue gate --phase 1        # P1→P2: 82/100 PASS
+fugue deliver               # DELIVERY: APPROVED → report generated
+fugue admin overview        # All projects at a glance
 ```
 
 ---

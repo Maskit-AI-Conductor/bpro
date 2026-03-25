@@ -137,12 +137,12 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
     console.log();
 
     // 3. Print work plan
-    console.log(`  ${chalk.bold('Step 1/4')}  Conductor analysis         ${chalk.dim('[est. ~30s]')}`);
-    console.log(`  ${chalk.bold('Step 2/4')}  AIOps model assignment     ${chalk.dim('[instant]')}`);
-    console.log(`  ${chalk.bold('Step 3/4')}  Domain analysis            ${chalk.dim('[est. ~2min]')}`);
-    console.log(`  ${chalk.bold('Step 4/4')}  Save results to staging    ${chalk.dim('[instant]')}`);
+    console.log(`  ${chalk.bold('Work Plan')}`);
+    console.log(`  ${chalk.dim('1.')} Conductor analysis`);
+    console.log(`  ${chalk.dim('2.')} AIOps model assignment`);
+    console.log(`  ${chalk.dim('3.')} Domain analysis (parallel)`);
+    console.log(`  ${chalk.dim('4.')} Save results to staging`);
     console.log(`  ${chalk.dim('\u2500'.repeat(40))}`);
-    console.log(`  Total estimated: ${chalk.dim('~2.5 min')}`);
     console.log();
 
     // 4. Health check
