@@ -3,9 +3,12 @@
  * Supports subscription mode (gemini CLI) and API mode.
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { ModelAdapter, GenerateOptions, GenerateResult } from './adapter.js';
 import { parseJsonResponse } from '../utils/json-repair.js';
+
+const execAsync = promisify(exec);
 
 export class GeminiAdapter implements ModelAdapter {
   name: string;
@@ -48,33 +51,38 @@ export class GeminiAdapter implements ModelAdapter {
     return this.generateViaApiWithUsage(prompt, options);
   }
 
-  private generateViaCliWithUsage(prompt: string, options?: GenerateOptions): GenerateResult {
-    const text = this.generateViaCli(prompt, options);
+  private async generateViaCliWithUsage(prompt: string, options?: GenerateOptions): Promise<GenerateResult> {
+    const text = await this.generateViaCliAsync(prompt, options);
     const tokens_in = Math.ceil(prompt.length / 4);
     const tokens_out = Math.ceil(text.length / 4);
     return { text, tokens_in, tokens_out };
   }
 
-  private generateViaCli(prompt: string, options?: GenerateOptions): string {
+  private async generateViaCliAsync(prompt: string, options?: GenerateOptions): Promise<string> {
     const fullPrompt = options?.system
       ? `${options.system}\n\n${prompt}`
       : prompt;
 
+    const tmpFile = `/tmp/fugue-gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
+    const fs = await import('node:fs');
+    fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
+
     try {
-      const result = execSync(
-        `gemini --print --model ${this.model}`,
+      const { stdout } = await execAsync(
+        `cat "${tmpFile}" | gemini --print --model ${this.model}`,
         {
-          input: fullPrompt,
           encoding: 'utf-8',
           timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
-          maxBuffer: 10 * 1024 * 1024,
-          stdio: ['pipe', 'pipe', 'pipe'],
+          maxBuffer: 50 * 1024 * 1024,
+          shell: '/bin/bash',
         },
       );
-      return result.trim();
+      return stdout.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Gemini CLI failed: ${msg}`);
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
     }
   }
 

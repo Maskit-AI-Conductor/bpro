@@ -3,7 +3,10 @@
  * Supports subscription mode (codex CLI) and API mode.
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 import type { ModelAdapter, GenerateOptions, GenerateResult } from './adapter.js';
 import { parseJsonResponse } from '../utils/json-repair.js';
 
@@ -56,34 +59,38 @@ export class OpenAIAdapter implements ModelAdapter {
     return this.generateViaApiWithUsage(prompt, options);
   }
 
-  private generateViaCliWithUsage(prompt: string, options?: GenerateOptions): GenerateResult {
-    const text = this.generateViaCli(prompt, options);
-    // CLI subscription: estimate tokens from text length (~4 chars per token)
+  private async generateViaCliWithUsage(prompt: string, options?: GenerateOptions): Promise<GenerateResult> {
+    const text = await this.generateViaCliAsync(prompt, options);
     const tokens_in = Math.ceil(prompt.length / 4);
     const tokens_out = Math.ceil(text.length / 4);
     return { text, tokens_in, tokens_out };
   }
 
-  private generateViaCli(prompt: string, options?: GenerateOptions): string {
+  private async generateViaCliAsync(prompt: string, options?: GenerateOptions): Promise<string> {
     const fullPrompt = options?.system
       ? `${options.system}\n\n${prompt}`
       : prompt;
 
+    const tmpFile = `/tmp/fugue-codex-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
+    const { writeFileSync, unlinkSync } = await import('node:fs');
+    writeFileSync(tmpFile, fullPrompt, 'utf-8');
+
     try {
-      const result = execSync(
-        `codex --print --model ${this.model}`,
+      const { stdout } = await execAsync(
+        `cat "${tmpFile}" | codex --print --model ${this.model}`,
         {
-          input: fullPrompt,
           encoding: 'utf-8',
           timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
-          maxBuffer: 10 * 1024 * 1024,
-          stdio: ['pipe', 'pipe', 'pipe'],
+          maxBuffer: 50 * 1024 * 1024,
+          shell: '/bin/bash',
         },
       );
-      return result.trim();
+      return stdout.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Codex CLI failed: ${msg}`);
+    } finally {
+      try { unlinkSync(tmpFile); } catch { /* ignore */ }
     }
   }
 

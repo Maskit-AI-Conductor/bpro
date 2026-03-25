@@ -5,10 +5,13 @@
  * 2. API: direct Anthropic API calls (API key required)
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+
+const execAsync = promisify(exec);
 import type { ModelAdapter, GenerateOptions, GenerateResult } from './adapter.js';
 import { parseJsonResponse } from '../utils/json-repair.js';
 
@@ -60,25 +63,23 @@ export class AnthropicAdapter implements ModelAdapter {
     return this.generateViaApiWithUsage(prompt, options);
   }
 
-  private generateViaCliWithUsage(prompt: string, options?: GenerateOptions): GenerateResult {
-    const text = this.generateViaCli(prompt, options);
-    // CLI subscription: estimate tokens from text length (~4 chars per token)
+  private async generateViaCliWithUsage(prompt: string, options?: GenerateOptions): Promise<GenerateResult> {
+    const text = await this.generateViaCliAsync(prompt, options);
     const tokens_in = Math.ceil(prompt.length / 4);
     const tokens_out = Math.ceil(text.length / 4);
     return { text, tokens_in, tokens_out };
   }
 
-  private generateViaCli(prompt: string, options?: GenerateOptions): string {
+  private async generateViaCliAsync(prompt: string, options?: GenerateOptions): Promise<string> {
     const fullPrompt = options?.system
       ? `${options.system}\n\n${prompt}`
       : prompt;
 
-    // Write prompt to temp file to avoid stdin pipe issues with large prompts
-    const tmpFile = path.join(os.tmpdir(), `fugue-prompt-${Date.now()}.txt`);
+    const tmpFile = path.join(os.tmpdir(), `fugue-prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`);
     fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
 
     try {
-      const result = execSync(
+      const { stdout } = await execAsync(
         `cat "${tmpFile}" | claude --print --model ${this.model}`,
         {
           encoding: 'utf-8',
@@ -87,7 +88,7 @@ export class AnthropicAdapter implements ModelAdapter {
           shell: '/bin/bash',
         },
       );
-      return result.trim();
+      return stdout.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Claude CLI failed: ${msg}`);
