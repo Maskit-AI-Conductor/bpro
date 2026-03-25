@@ -17,9 +17,13 @@ export interface ModelAssignment {
 /**
  * Assign models to agent roles based on rules:
  * - conductor/architect → most capable model
- * - domain-analyst → SLM first (cost optimization)
+ * - domain-analyst → LLM (requires business logic understanding — SLM insufficient)
  * - auditor → different model from conductor (cross-validation)
- * - tester → SLM
+ * - tester → SLM (pattern matching, repetitive — SLM OK)
+ *
+ * Principle: "SLM-first, not SLM-forced."
+ * SLM for: test generation, JSON parsing, formatting, structuring
+ * LLM for: domain analysis, requirement extraction, quality validation, architecture
  */
 export function assignModels(
   roles: AgentRole[],
@@ -55,15 +59,21 @@ export function assignModels(
         assigned = crossValidator ?? strongest;
         reason = 'Cross-validation: using different model from conductor';
         break;
-      case 'domain-analyst':
+      case 'domain-analyst': {
+        // Domain analysis requires understanding business logic — always use LLM
+        // SLM is insufficient for requirement extraction quality
+        const secondStrongest = ranked.length > 1 ? ranked[1] : strongest;
         if (role.recommended_tier === 'heavy') {
           assigned = strongest;
-          reason = 'High complexity domain — heavy model assigned';
+          reason = 'High complexity domain — strongest model';
         } else {
-          assigned = weakest;
-          reason = 'SLM-first: lightweight parsing task';
+          // Use second-strongest LLM, not SLM. Fall back to strongest if only 1 LLM available
+          const llmModels = ranked.filter(m => m.provider !== 'ollama');
+          assigned = llmModels.length > 1 ? llmModels[1] : (llmModels[0] ?? secondStrongest);
+          reason = 'Domain analysis requires LLM — business logic understanding needed';
         }
         break;
+      }
       case 'tester':
         assigned = weakest;
         reason = 'Test generation is repetitive — SLM sufficient';
