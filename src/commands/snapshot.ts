@@ -212,15 +212,21 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
       });
     }
 
-    // 7. Extract requirements per domain — Step 3/4
+    // 7. Extract requirements per domain — Step 3/4 (PARALLEL)
     console.log();
-    console.log(`  Step 3/4: Domain analysis`);
-    const allReqs: ReqSpec[] = [];
-    let reqCounter = 1;
+    console.log(`  Step 3/4: Domain analysis ${chalk.dim(`(${analysis.domains.length} domains, parallel)`)}`);
     const modelAssignmentsForMeta: Array<{ agent: string; model: string }> = [];
-    const totalDomains = analysis.domains.length;
-    let completedDomains = 0;
 
+    // Prepare domain tasks
+    interface DomainTask {
+      domain: typeof analysis.domains[0];
+      adapterName: string;
+      adapter: ReturnType<typeof getAdapter>;
+      files: Array<{ path: string; content: string }>;
+      agentName: string;
+    }
+
+    const domainTasks: DomainTask[] = [];
     for (const domain of analysis.domains) {
       const domainAnalyst = assignments.find(
         (a) => a.agentType === 'domain-analyst' && a.agentName.includes(domain.name),
@@ -228,8 +234,9 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
 
       const adapterName = domainAnalyst?.assignedModel ?? config.conductor!;
       const adapter = getAdapter(registry, adapterName);
+      const agentName = domainAnalyst?.agentName ?? domain.name;
 
-      modelAssignmentsForMeta.push({ agent: domainAnalyst?.agentName ?? domain.name, model: adapterName });
+      modelAssignmentsForMeta.push({ agent: agentName, model: adapterName });
 
       const domainFiles = fileContents.filter((f) =>
         domain.files.some((df) => {
@@ -242,63 +249,93 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
       const filesToAnalyze = domainFiles.length > 0 ? domainFiles : fileContents;
       if (domainFiles.length === 0 && analysis.domains.indexOf(domain) > 0) continue;
 
-      const domainStart = Date.now();
-      const domainSpinner = createSpinner(
-        `    ${domain.name.padEnd(18)} ${chalk.dim(`[${adapterName}]`)}  ...`
-      );
-      domainSpinner.start();
-
-      const batches = batchFiles(filesToAnalyze);
-      let domainReqCount = 0;
-
-      for (const batch of batches) {
-        try {
-          const batchReqs = await extractRequirements(adapter, batch, reqCounter);
-          if (Array.isArray(batchReqs)) {
-            for (const raw of batchReqs) {
-              const req: ReqSpec = {
-                id: `REQ-${String(reqCounter).padStart(3, '0')}`,
-                title: String(raw.title ?? ''),
-                priority: String(raw.priority ?? 'MEDIUM'),
-                description: String(raw.description ?? ''),
-                status: 'DRAFT',
-                created: new Date().toISOString(),
-                code_refs: (raw.source_files as string[]) ?? [],
-                test_refs: [],
-                assigned_model: adapterName,
-              };
-              reqCounter++;
-              domainReqCount++;
-              allReqs.push(req);
-            }
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          printInfo(`Batch error [${domain.name}]: ${msg.slice(0, 300)}`);
-        }
-      }
-
-      completedDomains++;
-      const domainElapsed = formatElapsed(Date.now() - domainStart);
-      domainSpinner.succeed(
-        `    ${domain.name.padEnd(18)} ${chalk.dim(`[${adapterName}]`)}  ${domainReqCount} REQs ${chalk.dim(`(${domainElapsed})`)}`
-      );
-
-      // Progress line
-      console.log(
-        chalk.dim(`    ${completedDomains}/${totalDomains} domains | ${allReqs.length} REQs so far`)
-      );
-
-      appendAgentLog(fugueDir, {
-        agent: domainAnalyst?.agentName ?? 'domain-analyst',
-        action: 'extract-requirements',
-        model: adapterName,
-        started_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        status: 'success',
-        output_summary: `${domain.name}: ${filesToAnalyze.length} files analyzed, ${domainReqCount} REQs`,
-      });
+      domainTasks.push({ domain, adapterName, adapter, files: filesToAnalyze, agentName });
     }
+
+    // Show queued domains
+    for (const dt of domainTasks) {
+      console.log(`    ${chalk.dim('○')} ${dt.domain.name.padEnd(18)} ${chalk.dim(`[${dt.adapterName}]`)}  queued`);
+    }
+
+    // Run domain analyses in parallel
+    const domainResults = await Promise.allSettled(
+      domainTasks.map(async (dt) => {
+        const domainStart = Date.now();
+        const batches = batchFiles(dt.files);
+        const reqs: ReqSpec[] = [];
+
+        for (const batch of batches) {
+          try {
+            const batchReqs = await extractRequirements(dt.adapter, batch, 1);
+            if (Array.isArray(batchReqs)) {
+              for (const raw of batchReqs) {
+                reqs.push({
+                  id: '', // assigned after merge
+                  title: String(raw.title ?? ''),
+                  priority: String(raw.priority ?? 'MEDIUM'),
+                  description: String(raw.description ?? ''),
+                  status: 'DRAFT',
+                  created: new Date().toISOString(),
+                  code_refs: (raw.source_files as string[]) ?? [],
+                  test_refs: [],
+                  assigned_model: dt.adapterName,
+                });
+              }
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            // Collect error but don't stop other domains
+            reqs.push({
+              id: '', title: `[ERROR] ${dt.domain.name}`, priority: 'LOW',
+              description: msg.slice(0, 200), status: 'DRAFT',
+              created: new Date().toISOString(), code_refs: [], test_refs: [],
+            });
+          }
+        }
+
+        const elapsed = Date.now() - domainStart;
+        return { domain: dt.domain, agentName: dt.agentName, adapterName: dt.adapterName, reqs, elapsed };
+      })
+    );
+
+    // Merge results + assign sequential IDs
+    const allReqs: ReqSpec[] = [];
+    let reqCounter = 1;
+    let completedDomains = 0;
+
+    // Clear queued lines and show results
+    // Move cursor up to overwrite queued lines
+    process.stdout.write(`\x1b[${domainTasks.length}A`);
+
+    for (const result of domainResults) {
+      if (result.status === 'fulfilled') {
+        const { domain, adapterName, reqs, elapsed } = result.value;
+        const validReqs = reqs.filter(r => !r.title.startsWith('[ERROR]'));
+        for (const req of validReqs) {
+          req.id = `REQ-${String(reqCounter).padStart(3, '0')}`;
+          reqCounter++;
+          allReqs.push(req);
+        }
+        completedDomains++;
+        const elapsedStr = formatElapsed(elapsed);
+        console.log(`    ${chalk.green('✔')} ${domain.name.padEnd(18)} ${chalk.dim(`[${adapterName}]`)}  ${validReqs.length} REQs ${chalk.dim(`(${elapsedStr})`)}`);
+
+        appendAgentLog(fugueDir, {
+          agent: result.value.agentName,
+          action: 'extract-requirements',
+          model: adapterName,
+          started_at: new Date(Date.now() - elapsed).toISOString(),
+          completed_at: new Date().toISOString(),
+          status: 'success',
+          output_summary: `${domain.name}: ${validReqs.length} REQs from ${result.value.reqs.length - validReqs.length === 0 ? 'all' : 'some'} batches`,
+        });
+      } else {
+        console.log(`    ${chalk.red('✖')} ${chalk.dim('domain failed:')} ${result.reason}`);
+      }
+    }
+
+    console.log(`  ${chalk.dim('-'.repeat(40))}`);
+    console.log(`  ${completedDomains}/${domainTasks.length} domains | ${allReqs.length} REQs total`);
 
     // Fallback if domains had no file matches
     if (allReqs.length === 0 && fileContents.length > 0) {
