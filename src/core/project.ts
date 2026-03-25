@@ -20,6 +20,7 @@ export const SUBDIRS = [
   'reports',
   'plans',
   'changes',
+  'tasks',
 ];
 
 export interface BproConfig {
@@ -401,4 +402,94 @@ export function diffStagingVsSpecs(bproPath: string): DiffEntry[] {
   // Sort by ID
   entries.sort((a, b) => a.id.localeCompare(b.id));
   return entries;
+}
+
+// --- Tasks ---
+
+export type TaskStatus = 'DRAFT' | 'OPEN' | 'DECOMPOSED' | 'CONFIRMED' | 'IN_PROGRESS' | 'DONE' | 'CLOSED';
+
+export interface TaskEscalation {
+  req_id: string;
+  reason: string;
+  created_at: string;
+  resolved: boolean;
+}
+
+export interface TaskData {
+  id: string;
+  title: string;
+  requester?: string;
+  assignees: string[];
+  status: TaskStatus;
+  created_at: string;
+  updated_at?: string;
+  plan_file?: string;
+  req_ids: string[];
+  escalations: TaskEscalation[];
+  validation?: {
+    pass: boolean;
+    issue_count: number;
+    validated_at: string;
+  };
+}
+
+/**
+ * Get tasks directory path.
+ */
+export function getTasksDir(bproPath: string): string {
+  return path.join(bproPath, 'tasks');
+}
+
+/**
+ * Generate the next TASK-NNN ID.
+ */
+export function nextTaskId(bproPath: string): string {
+  const tasksDir = getTasksDir(bproPath);
+  if (!fs.existsSync(tasksDir)) return 'TASK-001';
+
+  const files = fs.readdirSync(tasksDir)
+    .filter((f) => f.startsWith('TASK-') && f.endsWith('.yaml'))
+    .sort();
+
+  if (files.length === 0) return 'TASK-001';
+
+  const lastFile = files[files.length - 1];
+  const lastNum = parseInt(lastFile.replace('TASK-', '').replace('.yaml', ''), 10);
+  return `TASK-${String(lastNum + 1).padStart(3, '0')}`;
+}
+
+/**
+ * Save a task to .bpro/tasks/TASK-NNN.yaml
+ */
+export function saveTask(bproPath: string, task: TaskData): void {
+  const tasksDir = getTasksDir(bproPath);
+  fs.mkdirSync(tasksDir, { recursive: true });
+  saveYaml(path.join(tasksDir, `${task.id}.yaml`), task);
+}
+
+/**
+ * Load a single task by ID.
+ */
+export function loadTask(bproPath: string, taskId: string): TaskData | null {
+  const filePath = path.join(getTasksDir(bproPath), `${taskId}.yaml`);
+  return loadYaml<TaskData>(filePath);
+}
+
+/**
+ * Load all tasks.
+ */
+export function loadTasks(bproPath: string): TaskData[] {
+  const tasksDir = getTasksDir(bproPath);
+  if (!fs.existsSync(tasksDir)) return [];
+
+  const files = fs.readdirSync(tasksDir)
+    .filter((f) => f.startsWith('TASK-') && f.endsWith('.yaml'))
+    .sort();
+
+  const tasks: TaskData[] = [];
+  for (const file of files) {
+    const task = loadYaml<TaskData>(path.join(tasksDir, file));
+    if (task) tasks.push(task);
+  }
+  return tasks;
 }

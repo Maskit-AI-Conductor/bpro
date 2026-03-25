@@ -16,6 +16,7 @@ import { statusCommand } from './commands/status.js';
 import { reportCommand } from './commands/report.js';
 import { notifyCommand } from './commands/notify.js';
 import { setupCommand } from './commands/setup-cmd.js';
+import { taskCommand } from './commands/task.js';
 
 const program = new Command();
 
@@ -35,6 +36,7 @@ program.addCommand(statusCommand);
 program.addCommand(reportCommand);
 program.addCommand(notifyCommand);
 program.addCommand(setupCommand);
+program.addCommand(taskCommand);
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);
