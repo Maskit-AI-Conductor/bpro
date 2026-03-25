@@ -25,41 +25,73 @@ export const planCommand = new Command('plan')
   .description('Forward path: planning doc -> REQ IDs -> development');
 
 planCommand
-  .command('import <file>')
-  .description('Import a planning document (Markdown)')
-  .action(async (file: string) => {
+  .command('import <source>')
+  .description('Import a planning document (Markdown file or Notion URL)')
+  .action(async (source: string) => {
     try {
       const fugueDir = requireFugueDir();
-      const srcPath = path.resolve(file);
-
-      if (!fs.existsSync(srcPath)) {
-        printError(`File not found: ${file}`);
-        process.exit(1);
-      }
-
-      const ext = path.extname(srcPath).toLowerCase();
-      if (!['.md', '.txt', '.markdown'].includes(ext)) {
-        printWarning(`Expected Markdown file, got ${ext}. Importing anyway.`);
-      }
-
-      // Copy to .fugue/plans/
+      const isNotion = source.includes('notion.so') || source.includes('notion.site');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const destName = `${path.parse(srcPath).name}_${timestamp}${ext}`;
-      const destPath = path.join(fugueDir, 'plans', destName);
-      fs.mkdirSync(path.join(fugueDir, 'plans'), { recursive: true });
-      fs.copyFileSync(srcPath, destPath);
+      let destPath: string;
+      let lineCount: number;
+      let displayName: string;
+
+      if (isNotion) {
+        // Notion URL → fetch and convert to markdown
+        const spinner = createSpinner('Fetching from Notion...');
+        spinner.start();
+
+        try {
+          const { notionPageToMarkdown } = await import('../core/notion.js');
+          const { title, markdown } = await notionPageToMarkdown(source);
+
+          const safeName = title.replace(/[^a-zA-Z0-9가-힣_-]/g, '_').slice(0, 50);
+          const destName = `${safeName}_${timestamp}.md`;
+          destPath = path.join(fugueDir, 'plans', destName);
+          fs.mkdirSync(path.join(fugueDir, 'plans'), { recursive: true });
+          fs.writeFileSync(destPath, markdown, 'utf-8');
+
+          lineCount = markdown.split('\n').length;
+          displayName = title;
+          spinner.succeed(`Fetched "${title}" from Notion (${lineCount} lines)`);
+        } catch (err: unknown) {
+          spinner.fail('Failed to fetch from Notion');
+          printError(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      } else {
+        // Local file
+        const srcPath = path.resolve(source);
+
+        if (!fs.existsSync(srcPath)) {
+          printError(`File not found: ${source}`);
+          process.exit(1);
+        }
+
+        const ext = path.extname(srcPath).toLowerCase();
+        if (!['.md', '.txt', '.markdown'].includes(ext)) {
+          printWarning(`Expected Markdown file, got ${ext}. Importing anyway.`);
+        }
+
+        const destName = `${path.parse(srcPath).name}_${timestamp}${ext}`;
+        destPath = path.join(fugueDir, 'plans', destName);
+        fs.mkdirSync(path.join(fugueDir, 'plans'), { recursive: true });
+        fs.copyFileSync(srcPath, destPath);
+
+        lineCount = fs.readFileSync(destPath, 'utf-8').split('\n').length;
+        displayName = path.basename(srcPath);
+      }
 
       // Update config
       const config = loadConfig(fugueDir);
       if (!config.plan) config.plan = {};
       config.plan.source = path.relative(fugueDir, destPath);
       config.plan.imported_at = new Date().toISOString();
-      config.plan.original_path = srcPath;
+      config.plan.original_path = isNotion ? source : path.resolve(source);
       saveConfig(fugueDir, config);
 
-      const lineCount = fs.readFileSync(destPath, 'utf-8').split('\n').length;
-      printSuccess(`Imported ${path.basename(srcPath)} (${lineCount} lines)`);
-      console.log(`  ${chalk.dim(`Saved to .fugue/plans/${destName}`)}`);
+      printSuccess(`Imported ${displayName} (${lineCount} lines)`);
+      console.log(`  ${chalk.dim(`Saved to .fugue/plans/${path.basename(destPath)}`)}`);
       console.log();
       console.log(`  ${chalk.dim('Next:')} ${chalk.cyan('fugue plan decompose')} — extract REQ IDs`);
     } catch (err: unknown) {
