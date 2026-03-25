@@ -42,7 +42,8 @@ export class AnthropicAdapter implements ModelAdapter {
     if (this.subscription) {
       // Check if claude CLI is available
       try {
-        execSync('which claude', { stdio: 'pipe' });
+        const cmd = process.platform === 'win32' ? 'where claude' : 'which claude';
+        execSync(cmd, { stdio: 'pipe' });
         return true;
       } catch {
         return false;

@@ -38,7 +38,8 @@ export class OpenAIAdapter implements ModelAdapter {
   async checkHealth(): Promise<boolean> {
     if (this.subscription) {
       try {
-        execSync('which codex', { stdio: 'pipe' });
+        const cmd = process.platform === 'win32' ? 'where codex' : 'which codex';
+        execSync(cmd, { stdio: 'pipe' });
         return true;
       } catch {
         return false;

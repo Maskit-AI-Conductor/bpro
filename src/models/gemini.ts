@@ -29,7 +29,8 @@ export class GeminiAdapter implements ModelAdapter {
   async checkHealth(): Promise<boolean> {
     if (this.subscription) {
       try {
-        execSync('which gemini', { stdio: 'pipe' });
+        const cmd = process.platform === 'win32' ? 'where gemini' : 'which gemini';
+        execSync(cmd, { stdio: 'pipe' });
         return true;
       } catch {
         // Gemini CLI may not exist yet — still register
