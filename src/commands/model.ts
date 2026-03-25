@@ -1,5 +1,5 @@
 /**
- * bpro model — Model registry management with interactive selection.
+ * fugue model — Model registry management with interactive selection.
  */
 
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { select, input, confirm } from '@inquirer/prompts';
-import { requireBproDir, loadModels, saveModelsRaw, type ModelEntry } from '../core/project.js';
+import { requireFugueDir, loadModels, saveModelsRaw, type ModelEntry } from '../core/project.js';
 import { parseModelName, createAdapter } from '../models/registry.js';
 import { printSuccess, printError, printInfo, createSpinner } from '../utils/display.js';
 import type { AgentLog } from '../agents/runner.js';
@@ -51,8 +51,8 @@ modelCommand
   .option('--api-key <key>', 'API key')
   .action(async (name?: string, opts?: { endpoint?: string; apiKey?: string }) => {
     try {
-      const bproDir = requireBproDir();
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const registry = loadModels(fugueDir);
 
       let modelName = name;
       let endpoint = opts?.endpoint;
@@ -119,7 +119,7 @@ modelCommand
 
       // Check for duplicate
       if (registry.models.find(m => m.name === modelName)) {
-        printError(`Model '${modelName}' already registered. Remove it first: bpro model remove ${modelName}`);
+        printError(`Model '${modelName}' already registered. Remove it first: fugue model remove ${modelName}`);
         process.exit(1);
       }
 
@@ -167,16 +167,16 @@ modelCommand
       }
 
       registry.models.push(entry);
-      saveModelsRaw(bproDir, registry);
+      saveModelsRaw(fugueDir, registry);
 
       printSuccess(`Model '${modelName}' registered (${parsed.provider})`);
 
       // Hint if no conductor
       const { loadConfig } = await import('../core/project.js');
-      const config = loadConfig(bproDir);
+      const config = loadConfig(fugueDir);
       if (!config.conductor) {
         console.log();
-        console.log(`  ${chalk.dim('Next:')} ${chalk.cyan('bpro config set conductor')}`);
+        console.log(`  ${chalk.dim('Next:')} ${chalk.cyan('fugue config set conductor')}`);
       }
     } catch (err: unknown) {
       if ((err as { name?: string })?.name === 'ExitPromptError') {
@@ -193,14 +193,14 @@ modelCommand
   .description('List registered models')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const registry = loadModels(fugueDir);
       const { loadConfig } = await import('../core/project.js');
-      const config = loadConfig(bproDir);
+      const config = loadConfig(fugueDir);
 
       if (registry.models.length === 0) {
         printInfo('No models registered.');
-        console.log(`  ${chalk.cyan('bpro model add')} — register your first model`);
+        console.log(`  ${chalk.cyan('fugue model add')} — register your first model`);
         return;
       }
 
@@ -229,8 +229,8 @@ modelCommand
   .description('Remove a model from registry')
   .action(async (name: string) => {
     try {
-      const bproDir = requireBproDir();
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const registry = loadModels(fugueDir);
 
       const idx = registry.models.findIndex(m => m.name === name);
       if (idx === -1) {
@@ -239,14 +239,14 @@ modelCommand
       }
 
       registry.models.splice(idx, 1);
-      saveModelsRaw(bproDir, registry);
+      saveModelsRaw(fugueDir, registry);
 
       printSuccess(`Model '${name}' removed.`);
 
       const { loadConfig } = await import('../core/project.js');
-      const config = loadConfig(bproDir);
+      const config = loadConfig(fugueDir);
       if (config.conductor === name) {
-        console.log(`  ${chalk.yellow('WARN')} This was the conductor. Run: ${chalk.cyan('bpro config set conductor')}`);
+        console.log(`  ${chalk.yellow('WARN')} This was the conductor. Run: ${chalk.cyan('fugue config set conductor')}`);
       }
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
@@ -283,10 +283,10 @@ modelCommand
   .description('Show token usage and estimated cost per model')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
+      const fugueDir = requireFugueDir();
 
       // Read all .jsonl log files
-      const logsDir = path.join(bproDir, 'logs');
+      const logsDir = path.join(fugueDir, 'logs');
       if (!fs.existsSync(logsDir)) {
         printInfo('No agent logs found. Run agent tasks first.');
         return;

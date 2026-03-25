@@ -23,7 +23,7 @@ export class SlackPlugin implements NotificationPlugin {
 
   async test(): Promise<boolean> {
     const payload = {
-      text: ':white_check_mark: bpro notification test — connection successful!',
+      text: ':white_check_mark: fugue notification test — connection successful!',
     };
     return this.postToWebhook(payload);
   }
@@ -47,7 +47,7 @@ export class SlackPlugin implements NotificationPlugin {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `${icon} *bpro — ${event}*\n${message}`,
+          text: `${icon} *fugue — ${event}*\n${message}`,
         },
       },
     ];

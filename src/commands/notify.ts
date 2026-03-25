@@ -1,10 +1,10 @@
 /**
- * bpro notify — Manage notification plugins.
+ * fugue notify — Manage notification plugins.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { requireBproDir } from '../core/project.js';
+import { requireFugueDir } from '../core/project.js';
 import {
   loadNotifications,
   saveNotifications,
@@ -29,7 +29,7 @@ notifyCommand
   .option('--events <events>', 'Comma-separated event list', DEFAULT_EVENTS.join(','))
   .action(async (type: string, opts: { webhook?: string; events?: string }) => {
     try {
-      const bproDir = requireBproDir();
+      const fugueDir = requireFugueDir();
 
       if (type !== 'slack') {
         printError(`Unsupported notification type: ${type}. Currently only 'slack' is supported.`);
@@ -38,16 +38,16 @@ notifyCommand
 
       if (!opts.webhook) {
         printError('--webhook is required for slack notifications.');
-        console.log(`  ${chalk.cyan('bpro notify add slack --webhook https://hooks.slack.com/services/...')}`);
+        console.log(`  ${chalk.cyan('fugue notify add slack --webhook https://hooks.slack.com/services/...')}`);
         process.exit(1);
       }
 
-      const entries = loadNotifications(bproDir);
+      const entries = loadNotifications(fugueDir);
 
       // Check for duplicate
       const existing = entries.find(e => e.type === type);
       if (existing) {
-        printError(`Notification '${type}' already configured. Remove it first: bpro notify remove ${type}`);
+        printError(`Notification '${type}' already configured. Remove it first: fugue notify remove ${type}`);
         process.exit(1);
       }
 
@@ -61,12 +61,12 @@ notifyCommand
       };
 
       entries.push(entry);
-      saveNotifications(bproDir, entries);
+      saveNotifications(fugueDir, entries);
 
       printSuccess(`Slack notification added (${events.length} events)`);
       console.log(`  Events: ${chalk.dim(events.join(', '))}`);
       console.log();
-      console.log(`  ${chalk.dim('Test it:')} ${chalk.cyan('bpro notify test')}`);
+      console.log(`  ${chalk.dim('Test it:')} ${chalk.cyan('fugue notify test')}`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -78,12 +78,12 @@ notifyCommand
   .description('List configured notifications')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const entries = loadNotifications(bproDir);
+      const fugueDir = requireFugueDir();
+      const entries = loadNotifications(fugueDir);
 
       if (entries.length === 0) {
         printInfo('No notifications configured.');
-        console.log(`  ${chalk.cyan('bpro notify add slack --webhook <url>')}`);
+        console.log(`  ${chalk.cyan('fugue notify add slack --webhook <url>')}`);
         return;
       }
 
@@ -111,8 +111,8 @@ notifyCommand
   .description('Remove a notification plugin')
   .action(async (type: string) => {
     try {
-      const bproDir = requireBproDir();
-      const entries = loadNotifications(bproDir);
+      const fugueDir = requireFugueDir();
+      const entries = loadNotifications(fugueDir);
 
       const idx = entries.findIndex(e => e.type === type);
       if (idx === -1) {
@@ -121,7 +121,7 @@ notifyCommand
       }
 
       entries.splice(idx, 1);
-      saveNotifications(bproDir, entries);
+      saveNotifications(fugueDir, entries);
 
       printSuccess(`Notification '${type}' removed.`);
     } catch (err: unknown) {
@@ -135,8 +135,8 @@ notifyCommand
   .description('Send a test notification to all configured plugins')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const entries = loadNotifications(bproDir);
+      const fugueDir = requireFugueDir();
+      const entries = loadNotifications(fugueDir);
 
       if (entries.length === 0) {
         printInfo('No notifications configured.');

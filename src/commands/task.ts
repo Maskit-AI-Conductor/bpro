@@ -1,5 +1,5 @@
 /**
- * bpro task — Task management with progressive control mode.
+ * fugue task — Task management with progressive control mode.
  *
  * Workflow: new → import → validate → decompose → confirm → assign → done
  * Requester and worker are separated roles.
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  requireBproDir,
+  requireFugueDir,
   loadConfig,
   loadModels,
   loadSpecs,
@@ -47,8 +47,8 @@ taskCommand
   .option('--requester <name>', 'Name of the requester')
   .action(async (title: string, opts: { requester?: string }) => {
     try {
-      const bproDir = requireBproDir();
-      const taskId = nextTaskId(bproDir);
+      const fugueDir = requireFugueDir();
+      const taskId = nextTaskId(fugueDir);
       const now = new Date().toISOString();
 
       const task: TaskData = {
@@ -63,7 +63,7 @@ taskCommand
         escalations: [],
       };
 
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       printSuccess(`Created ${chalk.cyan(taskId)}: ${title}`);
       if (opts.requester) {
@@ -71,7 +71,7 @@ taskCommand
       }
       console.log(`  Status:    ${chalk.dim('DRAFT')}`);
       console.log();
-      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`bpro task import ${taskId} <file>`)} — attach planning doc`);
+      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`fugue task import ${taskId} <file>`)} — attach planning doc`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -87,8 +87,8 @@ taskCommand
   .description('Import a planning document for a task')
   .action(async (taskId: string, file: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       const srcPath = path.resolve(file);
       if (!fs.existsSync(srcPath)) {
@@ -96,7 +96,7 @@ taskCommand
         process.exit(1);
       }
 
-      // Copy to .bpro/plans/
+      // Copy to .fugue/plans/
       const ext = path.extname(srcPath).toLowerCase();
       if (!['.md', '.txt', '.markdown'].includes(ext)) {
         printWarning(`Expected Markdown file, got ${ext}. Importing anyway.`);
@@ -104,22 +104,22 @@ taskCommand
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const destName = `${taskId}_${path.parse(srcPath).name}_${timestamp}${ext}`;
-      const destPath = path.join(bproDir, 'plans', destName);
-      fs.mkdirSync(path.join(bproDir, 'plans'), { recursive: true });
+      const destPath = path.join(fugueDir, 'plans', destName);
+      fs.mkdirSync(path.join(fugueDir, 'plans'), { recursive: true });
       fs.copyFileSync(srcPath, destPath);
 
       // Update task
-      task.plan_file = path.relative(bproDir, destPath);
+      task.plan_file = path.relative(fugueDir, destPath);
       task.status = transitionStatus(task.status, 'OPEN');
       task.updated_at = new Date().toISOString();
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       const lineCount = fs.readFileSync(destPath, 'utf-8').split('\n').length;
       printSuccess(`Imported ${path.basename(srcPath)} (${lineCount} lines) to ${chalk.cyan(taskId)}`);
-      console.log(`  ${chalk.dim(`Saved to .bpro/plans/${destName}`)}`);
+      console.log(`  ${chalk.dim(`Saved to .fugue/plans/${destName}`)}`);
       console.log(`  Status: ${formatStatus(task.status)}`);
       console.log();
-      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`bpro task validate ${taskId}`)} — check doc quality`);
+      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`fugue task validate ${taskId}`)} — check doc quality`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -135,17 +135,17 @@ taskCommand
   .description('Validate planning document quality (conductor)')
   .action(async (taskId: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
-      const config = loadConfig(bproDir);
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
+      const config = loadConfig(fugueDir);
+      const registry = loadModels(fugueDir);
 
       if (!task.plan_file) {
-        printError(`No planning doc for ${taskId}. Run \`bpro task import ${taskId} <file>\` first.`);
+        printError(`No planning doc for ${taskId}. Run \`fugue task import ${taskId} <file>\` first.`);
         process.exit(1);
       }
 
-      const docPath = path.join(bproDir, task.plan_file);
+      const docPath = path.join(fugueDir, task.plan_file);
       if (!fs.existsSync(docPath)) {
         printError(`Planning doc not found: ${docPath}`);
         process.exit(1);
@@ -202,7 +202,7 @@ taskCommand
         validated_at: new Date().toISOString(),
       };
       task.updated_at = new Date().toISOString();
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       // Print issues
       if (issues.length > 0) {
@@ -224,7 +224,7 @@ taskCommand
 
       console.log();
       if (result.pass && errors.length === 0) {
-        console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`bpro task decompose ${taskId}`)} — extract REQ IDs`);
+        console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`fugue task decompose ${taskId}`)} — extract REQ IDs`);
       } else {
         console.log(`  ${chalk.dim('Fix issues and re-import, then validate again.')}`);
       }
@@ -243,17 +243,17 @@ taskCommand
   .description('Decompose planning doc into REQ IDs (conductor)')
   .action(async (taskId: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
-      const config = loadConfig(bproDir);
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
+      const config = loadConfig(fugueDir);
+      const registry = loadModels(fugueDir);
 
       if (!task.plan_file) {
-        printError(`No planning doc for ${taskId}. Run \`bpro task import ${taskId} <file>\` first.`);
+        printError(`No planning doc for ${taskId}. Run \`fugue task import ${taskId} <file>\` first.`);
         process.exit(1);
       }
 
-      const docPath = path.join(bproDir, task.plan_file);
+      const docPath = path.join(fugueDir, task.plan_file);
       if (!fs.existsSync(docPath)) {
         printError(`Planning doc not found: ${docPath}`);
         process.exit(1);
@@ -317,7 +317,7 @@ taskCommand
             section: String(raw.source_section ?? ''),
           },
         };
-        saveSpec(bproDir, req);
+        saveSpec(fugueDir, req);
         saved.push(req);
         reqIds.push(req.id);
       }
@@ -326,12 +326,12 @@ taskCommand
       task.req_ids = reqIds;
       task.status = transitionStatus(task.status, 'DECOMPOSED');
       task.updated_at = now;
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       console.log();
       printReqTable(saved, `Requirements for ${taskId} (${saved.length})`);
       console.log();
-      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`bpro task confirm ${taskId}`)} — requester confirms REQs`);
+      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`fugue task confirm ${taskId}`)} — requester confirms REQs`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -348,16 +348,16 @@ taskCommand
   .option('--requester <name>', 'Name of the confirming requester')
   .action(async (taskId: string, opts: { requester?: string }) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       if (task.req_ids.length === 0) {
-        printError(`No REQs for ${taskId}. Run \`bpro task decompose ${taskId}\` first.`);
+        printError(`No REQs for ${taskId}. Run \`fugue task decompose ${taskId}\` first.`);
         process.exit(1);
       }
 
       // Load the REQs belonging to this task
-      const allSpecs = loadSpecs(bproDir);
+      const allSpecs = loadSpecs(fugueDir);
       const taskReqs = allSpecs.filter((r) => task.req_ids.includes(r.id));
       const draftReqs = taskReqs.filter((r) => r.status === 'DRAFT');
 
@@ -390,7 +390,7 @@ taskCommand
       for (const req of draftReqs) {
         req.status = 'CONFIRMED';
         req.confirmed_at = now;
-        saveSpec(bproDir, req);
+        saveSpec(fugueDir, req);
       }
 
       // Update task
@@ -399,12 +399,12 @@ taskCommand
       if (opts.requester) {
         task.requester = opts.requester;
       }
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       printSuccess(`${draftReqs.length} REQs confirmed for ${chalk.cyan(taskId)}.`);
       console.log(`  Status: ${formatStatus(task.status)}`);
       console.log();
-      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`bpro task assign ${taskId} --to <name>`)} — assign a worker`);
+      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan(`fugue task assign ${taskId} --to <name>`)} — assign a worker`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -421,8 +421,8 @@ taskCommand
   .requiredOption('--to <name>', 'Worker name (person or agent)')
   .action(async (taskId: string, opts: { to: string }) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       if (!task.assignees.includes(opts.to)) {
         task.assignees.push(opts.to);
@@ -430,13 +430,13 @@ taskCommand
 
       task.status = transitionStatus(task.status, 'IN_PROGRESS');
       task.updated_at = new Date().toISOString();
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       printSuccess(`Assigned ${chalk.yellow(opts.to)} to ${chalk.cyan(taskId)}`);
       console.log(`  Assignees: ${task.assignees.map((a) => chalk.yellow(a)).join(', ')}`);
       console.log(`  Status:    ${formatStatus(task.status)}`);
       console.log();
-      console.log(`  ${chalk.dim('When done:')} ${chalk.cyan(`bpro task done ${taskId}`)} — report completion`);
+      console.log(`  ${chalk.dim('When done:')} ${chalk.cyan(`fugue task done ${taskId}`)} — report completion`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -452,20 +452,20 @@ taskCommand
   .description('Report task completion + auto-verify REQs')
   .action(async (taskId: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       if (task.req_ids.length === 0) {
         printWarning(`No REQs tracked for ${taskId}. Marking as DONE anyway.`);
         task.status = 'DONE';
         task.updated_at = new Date().toISOString();
-        saveTask(bproDir, task);
+        saveTask(fugueDir, task);
         printSuccess(`${chalk.cyan(taskId)} marked as DONE`);
         return;
       }
 
       // Verify REQs
-      const allSpecs = loadSpecs(bproDir);
+      const allSpecs = loadSpecs(fugueDir);
       const taskReqs = allSpecs.filter((r) => task.req_ids.includes(r.id));
 
       const missing: string[] = [];
@@ -514,7 +514,7 @@ taskCommand
       // PASS
       task.status = 'DONE';
       task.updated_at = new Date().toISOString();
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       printSuccess(`${chalk.cyan(taskId)} completed`);
       if (noCodeRefs.length > 0) {
@@ -522,10 +522,10 @@ taskCommand
       }
 
       console.log();
-      console.log(`  ${chalk.dim('Generate report:')} ${chalk.cyan(`bpro task report ${taskId}`)}`);
+      console.log(`  ${chalk.dim('Generate report:')} ${chalk.cyan(`fugue task report ${taskId}`)}`);
 
       // Emit notification
-      await emitEvent(bproDir, 'agent.task.complete', `Task ${taskId} completed: ${task.title}`, {
+      await emitEvent(fugueDir, 'agent.task.complete', `Task ${taskId} completed: ${task.title}`, {
         taskId,
         title: task.title,
         requester: task.requester ?? '',
@@ -547,8 +547,8 @@ taskCommand
   .requiredOption('--reason <text>', 'Reason for escalation')
   .action(async (taskId: string, reqId: string, opts: { reason: string }) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       const escalation: TaskEscalation = {
         req_id: reqId,
@@ -559,7 +559,7 @@ taskCommand
 
       task.escalations.push(escalation);
       task.updated_at = new Date().toISOString();
-      saveTask(bproDir, task);
+      saveTask(fugueDir, task);
 
       printSuccess(`Escalation added to ${chalk.cyan(taskId)}`);
       console.log(`  REQ:    ${chalk.cyan(reqId)}`);
@@ -585,8 +585,8 @@ taskCommand
   .option('--requester <name>', 'Filter by requester')
   .action(async (opts: { status?: string; requester?: string }) => {
     try {
-      const bproDir = requireBproDir();
-      let tasks = loadTasks(bproDir);
+      const fugueDir = requireFugueDir();
+      let tasks = loadTasks(fugueDir);
 
       if (opts.status) {
         const s = opts.status.toUpperCase();
@@ -644,8 +644,8 @@ taskCommand
   .description('Show task details')
   .action(async (taskId: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
 
       console.log();
       console.log(`  ${chalk.bold(task.id)}: ${task.title}`);
@@ -666,7 +666,7 @@ taskCommand
       if (task.req_ids.length > 0) {
         console.log();
         console.log(`  ${chalk.bold('REQs')} (${task.req_ids.length}):`);
-        const allSpecs = loadSpecs(bproDir);
+        const allSpecs = loadSpecs(fugueDir);
         for (const reqId of task.req_ids) {
           const spec = allSpecs.find((s) => s.id === reqId);
           if (spec) {
@@ -705,9 +705,9 @@ taskCommand
   .description('Generate a Markdown report for the task')
   .action(async (taskId: string) => {
     try {
-      const bproDir = requireBproDir();
-      const task = requireTask(bproDir, taskId);
-      const allSpecs = loadSpecs(bproDir);
+      const fugueDir = requireFugueDir();
+      const task = requireTask(fugueDir, taskId);
+      const allSpecs = loadSpecs(fugueDir);
       const taskReqs = allSpecs.filter((r) => task.req_ids.includes(r.id));
 
       const lines: string[] = [];
@@ -773,7 +773,7 @@ taskCommand
       lines.push(`Generated: ${new Date().toISOString()}`);
 
       // Save report
-      const reportsDir = path.join(bproDir, 'reports');
+      const reportsDir = path.join(fugueDir, 'reports');
       fs.mkdirSync(reportsDir, { recursive: true });
       const reportName = `${taskId}_report_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`;
       const reportPath = path.join(reportsDir, reportName);
@@ -783,7 +783,7 @@ taskCommand
       console.log();
 
       // Also emit notification
-      await emitEvent(bproDir, 'report.generated', `Report generated for ${taskId}`, {
+      await emitEvent(fugueDir, 'report.generated', `Report generated for ${taskId}`, {
         taskId,
         title: task.title,
         reportPath,
@@ -798,11 +798,11 @@ taskCommand
 // Helpers
 // =============================================
 
-function requireTask(bproDir: string, taskId: string): TaskData {
+function requireTask(fugueDir: string, taskId: string): TaskData {
   const normalized = taskId.toUpperCase();
-  const task = loadTask(bproDir, normalized);
+  const task = loadTask(fugueDir, normalized);
   if (!task) {
-    throw new Error(`Task ${normalized} not found. Run \`bpro task list\` to see tasks.`);
+    throw new Error(`Task ${normalized} not found. Run \`fugue task list\` to see tasks.`);
   }
   return task;
 }

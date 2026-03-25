@@ -1,6 +1,6 @@
 /**
- * bpro setup — One-shot setup: scan available models, register all, pick conductor.
- * Called automatically after `bpro init`, or standalone via `bpro setup`.
+ * fugue setup — One-shot setup: scan available models, register all, pick conductor.
+ * Called automatically after `fugue init`, or standalone via `fugue setup`.
  */
 
 import { execSync } from 'node:child_process';
@@ -93,7 +93,7 @@ async function detectModels(): Promise<DetectedModel[]> {
 /**
  * Run the full setup flow: detect → select → register → pick conductor.
  */
-export async function runSetup(bproDir: string): Promise<void> {
+export async function runSetup(fugueDir: string): Promise<void> {
   console.log();
   printInfo('Scanning for available models...');
 
@@ -110,7 +110,7 @@ export async function runSetup(bproDir: string): Promise<void> {
     console.log(`  ${chalk.cyan('ollama')} local  — ${chalk.dim('https://ollama.com')}`);
     console.log(`  ${chalk.cyan('codex')} CLI     — ${chalk.dim('npm install -g @openai/codex')}`);
     console.log();
-    console.log(`  Or register manually: ${chalk.cyan('bpro model add')}`);
+    console.log(`  Or register manually: ${chalk.cyan('fugue model add')}`);
     return;
   }
 
@@ -130,12 +130,12 @@ export async function runSetup(bproDir: string): Promise<void> {
   });
 
   if (selected.length === 0) {
-    printWarning('No models selected. Run `bpro model add` later.');
+    printWarning('No models selected. Run `fugue model add` later.');
     return;
   }
 
   // Register selected models
-  const registry = loadModels(bproDir);
+  const registry = loadModels(fugueDir);
 
   for (const name of selected) {
     const model = detected.find(d => d.name === name);
@@ -156,7 +156,7 @@ export async function runSetup(bproDir: string): Promise<void> {
     console.log(`  ${chalk.green('✓')} ${chalk.cyan(name)} registered ${model.subscription ? chalk.green('[subscription]') : ''}`);
   }
 
-  saveModelsRaw(bproDir, registry);
+  saveModelsRaw(fugueDir, registry);
   console.log();
 
   // Pick conductor
@@ -169,9 +169,9 @@ export async function runSetup(bproDir: string): Promise<void> {
       })),
     });
 
-    const config = loadConfig(bproDir);
+    const config = loadConfig(fugueDir);
     config.conductor = conductorChoice;
-    saveConfig(bproDir, config);
+    saveConfig(fugueDir, config);
 
     const model = registry.models.find(m => m.name === conductorChoice);
     printSuccess(`Conductor: ${conductorChoice} (${model?.provider})`);
@@ -181,10 +181,10 @@ export async function runSetup(bproDir: string): Promise<void> {
   printSuccess(`Setup complete! ${registry.models.length} model(s) registered.`);
   console.log();
   console.log('  Next:');
-  console.log(`  ${chalk.cyan('bpro snapshot')}                      — reverse-engineer code`);
-  console.log(`  ${chalk.cyan('bpro plan import ./planning-doc.md')} — start from planning doc`);
+  console.log(`  ${chalk.cyan('fugue snapshot')}                      — reverse-engineer code`);
+  console.log(`  ${chalk.cyan('fugue plan import ./planning-doc.md')} — start from planning doc`);
   console.log();
-  console.log(`  ${chalk.dim('To change models later:')} ${chalk.cyan('bpro model add')} / ${chalk.cyan('bpro model remove')}`);
-  console.log(`  ${chalk.dim('To change conductor:')}    ${chalk.cyan('bpro config set conductor')}`);
+  console.log(`  ${chalk.dim('To change models later:')} ${chalk.cyan('fugue model add')} / ${chalk.cyan('fugue model remove')}`);
+  console.log(`  ${chalk.dim('To change conductor:')}    ${chalk.cyan('fugue config set conductor')}`);
   console.log();
 }

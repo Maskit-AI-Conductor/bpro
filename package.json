@@ -1,12 +1,17 @@
 {
-  "name": "bpro-cli",
-  "version": "0.2.0",
-  "description": "Beyond Prototype — AI-powered PMO with conductor-based orchestration",
+  "name": "fugue-cli",
+  "version": "0.3.0",
+  "description": "Fugue — AI agents in concert. Conductor-based PMO for your terminal.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "bpro": "dist/index.js"
+    "fugue": "dist/index.js"
   },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
@@ -18,20 +23,22 @@
     "pmo",
     "ai",
     "agent",
-    "audit",
     "conductor",
+    "fugue",
+    "audit",
     "requirements",
-    "cli"
+    "cli",
+    "slm"
   ],
   "author": "Maskit <dev@maskit.co.kr>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Maskit-AI-Conductor/bpro"
+    "url": "https://github.com/Maskit-AI-Conductor/fugue"
   },
-  "homepage": "https://github.com/Maskit-AI-Conductor/bpro",
+  "homepage": "https://github.com/Maskit-AI-Conductor/fugue",
   "bugs": {
-    "url": "https://github.com/Maskit-AI-Conductor/bpro/issues"
+    "url": "https://github.com/Maskit-AI-Conductor/fugue/issues"
   },
   "engines": {
     "node": ">=18.0.0"

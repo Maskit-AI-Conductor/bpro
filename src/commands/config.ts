@@ -1,31 +1,31 @@
 /**
- * bpro config — Configuration management with interactive conductor selection.
+ * fugue config — Configuration management with interactive conductor selection.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { select } from '@inquirer/prompts';
-import { requireBproDir, loadConfig, saveConfig, loadModels } from '../core/project.js';
+import { requireFugueDir, loadConfig, saveConfig, loadModels } from '../core/project.js';
 import { printSuccess, printError, printWarning, printInfo } from '../utils/display.js';
 
 export const configCommand = new Command('config')
-  .description('Manage bpro configuration');
+  .description('Manage fugue configuration');
 
 configCommand
   .command('set <key> [value]')
   .description('Set a configuration value (e.g. conductor)')
   .action(async (key: string, value?: string) => {
     try {
-      const bproDir = requireBproDir();
-      const config = loadConfig(bproDir);
+      const fugueDir = requireFugueDir();
+      const config = loadConfig(fugueDir);
 
       switch (key) {
         case 'conductor': {
-          const registry = loadModels(bproDir);
+          const registry = loadModels(fugueDir);
 
           if (registry.models.length === 0) {
             printWarning('No models registered.');
-            console.log(`  Run ${chalk.cyan('bpro model add')} first.`);
+            console.log(`  Run ${chalk.cyan('fugue model add')} first.`);
             process.exit(1);
           }
 
@@ -45,12 +45,12 @@ configCommand
           const model = registry.models.find(m => m.name === selectedModel);
           if (!model) {
             printWarning(`Model '${selectedModel}' is not registered.`);
-            console.log(`  Register it first: ${chalk.cyan(`bpro model add`)}`);
+            console.log(`  Register it first: ${chalk.cyan(`fugue model add`)}`);
             process.exit(1);
           }
 
           config.conductor = selectedModel;
-          saveConfig(bproDir, config);
+          saveConfig(fugueDir, config);
           printSuccess(`Conductor set to '${selectedModel}' (${model.provider})`);
           break;
         }
@@ -60,17 +60,17 @@ configCommand
             value = await input({ message: 'Name for your conductor (e.g. maestro, 마에스트로):' });
           }
           config.conductor_name = value;
-          saveConfig(bproDir, config);
+          saveConfig(fugueDir, config);
           printSuccess(`Conductor named '${value}'. Call with @${value}`);
           break;
         }
         default:
           if (!value) {
-            printError(`Usage: bpro config set ${key} <value>`);
+            printError(`Usage: fugue config set ${key} <value>`);
             process.exit(1);
           }
           (config as Record<string, unknown>)[key] = value;
-          saveConfig(bproDir, config);
+          saveConfig(fugueDir, config);
           printSuccess(`${key} = ${value}`);
       }
     } catch (err: unknown) {
@@ -85,12 +85,12 @@ configCommand
   .description('Show current configuration')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const config = loadConfig(bproDir);
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const config = loadConfig(fugueDir);
+      const registry = loadModels(fugueDir);
 
       console.log();
-      console.log(`  ${chalk.bold('bpro Configuration')}`);
+      console.log(`  ${chalk.bold('fugue Configuration')}`);
       console.log(`  ${chalk.dim('-'.repeat(40))}`);
       console.log(`  Project:    ${chalk.cyan(config.project_name)}`);
       console.log(`  Version:    ${config.version}`);
@@ -100,7 +100,7 @@ configCommand
         const model = registry.models.find(m => m.name === config.conductor);
         console.log(`  Conductor:  ${chalk.yellow(config.conductor)} (${model?.provider ?? 'unknown'})`);
       } else {
-        console.log(`  Conductor:  ${chalk.dim('not set')} — run ${chalk.cyan('bpro config set conductor')}`);
+        console.log(`  Conductor:  ${chalk.dim('not set')} — run ${chalk.cyan('fugue config set conductor')}`);
       }
 
       console.log(`  Models:     ${registry.models.length} registered`);

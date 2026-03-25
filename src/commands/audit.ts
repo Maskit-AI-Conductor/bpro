@@ -1,5 +1,5 @@
 /**
- * bpro audit — Run audit (gap detection, gate judgment).
+ * fugue audit — Run audit (gap detection, gate judgment).
  */
 
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  requireBproDir,
+  requireFugueDir,
   loadConfig,
   loadSpecs,
   loadMatrix,
@@ -32,17 +32,17 @@ export const auditCommand = new Command('audit')
   .option('--gate', 'Run gate judgment (PASS/CONDITIONAL/FAIL)')
   .action(async (opts: { quick?: boolean; gate?: boolean }) => {
     try {
-      const bproDir = requireBproDir();
-      const reqs = loadSpecs(bproDir);
+      const fugueDir = requireFugueDir();
+      const reqs = loadSpecs(fugueDir);
 
       if (reqs.length === 0) {
-        printWarning('No requirements to audit. Run `bpro plan import` or `bpro snapshot` first.');
+        printWarning('No requirements to audit. Run `fugue plan import` or `fugue snapshot` first.');
         return;
       }
 
-      const matrix = loadMatrix(bproDir);
+      const matrix = loadMatrix(fugueDir);
       const entries = matrix?.entries ?? {};
-      const root = path.dirname(bproDir);
+      const root = path.dirname(fugueDir);
 
       const results: Record<string, AuditResult[]> = {
         pass: [],
@@ -89,8 +89,8 @@ export const auditCommand = new Command('audit')
 
       // If --gate and not --quick, use conductor for deeper analysis
       if (opts.gate && !opts.quick) {
-        const config = loadConfig(bproDir);
-        const registry = loadModels(bproDir);
+        const config = loadConfig(fugueDir);
+        const registry = loadModels(fugueDir);
         try {
           const adapter = getConductorAdapter(config.conductor, registry);
           const spinner = createSpinner('Running deep audit with conductor...');
@@ -112,7 +112,7 @@ export const auditCommand = new Command('audit')
             printInfo(`Conductor: ${deepResult.summary}`);
           }
 
-          appendAgentLog(bproDir, {
+          appendAgentLog(fugueDir, {
             agent: 'auditor',
             action: 'deep-audit',
             model: adapter.name,
@@ -171,16 +171,16 @@ export const auditCommand = new Command('audit')
         ),
         details: results,
       };
-      const reportsDir = path.join(bproDir, 'reports');
+      const reportsDir = path.join(fugueDir, 'reports');
       fs.mkdirSync(reportsDir, { recursive: true });
       saveYaml(path.join(reportsDir, `audit-${ts}.yaml`), auditResult);
 
       console.log();
-      console.log(`  ${chalk.dim(`Saved to .bpro/reports/audit-${ts}.yaml`)}`);
+      console.log(`  ${chalk.dim(`Saved to .fugue/reports/audit-${ts}.yaml`)}`);
 
       // Emit notification
       const totalIssues = Object.values(auditResult.summary).reduce((a, b) => a + (b as number), 0);
-      await emitEvent(bproDir, 'audit.complete', `Audit complete`, {
+      await emitEvent(fugueDir, 'audit.complete', `Audit complete`, {
         Summary: Object.entries(auditResult.summary).map(([k, v]) => `${k}:${v}`).join(' '),
         'Total Items': String(totalIssues),
       });

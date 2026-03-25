@@ -1,10 +1,10 @@
 /**
- * bpro agent — Agent management with detailed view.
+ * fugue agent — Agent management with detailed view.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { requireBproDir, loadConfig, loadModels } from '../core/project.js';
+import { requireFugueDir, loadConfig, loadModels } from '../core/project.js';
 import { loadAgentDefs, readAgentLogs, listLoggedAgents } from '../agents/runner.js';
 import { printError, printInfo, printWarning } from '../utils/display.js';
 
@@ -16,11 +16,11 @@ agentCommand
   .description('List all agents with model assignments')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const config = loadConfig(bproDir);
-      const registry = loadModels(bproDir);
-      const defs = await loadAgentDefs(bproDir);
-      const loggedAgents = listLoggedAgents(bproDir);
+      const fugueDir = requireFugueDir();
+      const config = loadConfig(fugueDir);
+      const registry = loadModels(fugueDir);
+      const defs = await loadAgentDefs(fugueDir);
+      const loggedAgents = listLoggedAgents(fugueDir);
 
       console.log();
 
@@ -35,7 +35,7 @@ agentCommand
       }
 
       if (defs.length === 0 && loggedAgents.length === 0) {
-        printInfo('No agents defined yet. Run `bpro snapshot` to auto-generate agents.');
+        printInfo('No agents defined yet. Run `fugue snapshot` to auto-generate agents.');
         return;
       }
 
@@ -63,7 +63,7 @@ agentCommand
         console.log(`  ${chalk.bold(typeLabels[type] ?? type)}`);
 
         for (const def of agents) {
-          const logs = readAgentLogs(bproDir, def.name);
+          const logs = readAgentLogs(fugueDir, def.name);
           const logCount = logs.length;
           const successCount = logs.filter(l => l.status === 'success').length;
           const rate = logCount > 0 ? Math.round((successCount / logCount) * 100) : 0;
@@ -85,7 +85,7 @@ agentCommand
       if (orphanAgents.length > 0) {
         console.log(`  ${chalk.bold('Unregistered (has logs)')}`);
         for (const name of orphanAgents) {
-          const logs = readAgentLogs(bproDir, name);
+          const logs = readAgentLogs(fugueDir, name);
           console.log(`    ${chalk.dim(name)} — ${logs.length} runs`);
         }
         console.log();
@@ -106,8 +106,8 @@ agentCommand
   .description('View agent work log')
   .action(async (name: string) => {
     try {
-      const bproDir = requireBproDir();
-      const logs = readAgentLogs(bproDir, name);
+      const fugueDir = requireFugueDir();
+      const logs = readAgentLogs(fugueDir, name);
 
       if (logs.length === 0) {
         printWarning(`No logs found for agent '${name}'.`);
@@ -141,9 +141,9 @@ agentCommand
   .description('Evaluate agent performance')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const defs = await loadAgentDefs(bproDir);
-      const loggedAgents = listLoggedAgents(bproDir);
+      const fugueDir = requireFugueDir();
+      const defs = await loadAgentDefs(fugueDir);
+      const loggedAgents = listLoggedAgents(fugueDir);
 
       const allAgents = new Set([...defs.map(d => d.name), ...loggedAgents]);
 
@@ -158,7 +158,7 @@ agentCommand
 
       for (const name of allAgents) {
         const def = defs.find(d => d.name === name);
-        const logs = readAgentLogs(bproDir, name);
+        const logs = readAgentLogs(fugueDir, name);
         const total = logs.length;
         const success = logs.filter(l => l.status === 'success').length;
         const failures = logs.filter(l => l.status === 'failure').length;

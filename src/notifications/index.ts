@@ -35,19 +35,19 @@ export interface NotificationsConfig {
 }
 
 /**
- * Load notification entries from .bpro/config.yaml.
+ * Load notification entries from .fugue/config.yaml.
  */
-export function loadNotifications(bproPath: string): NotificationEntry[] {
-  const configPath = path.join(bproPath, 'config.yaml');
+export function loadNotifications(fuguePath: string): NotificationEntry[] {
+  const configPath = path.join(fuguePath, 'config.yaml');
   const config = loadYaml<NotificationsConfig>(configPath);
   return config?.notifications ?? [];
 }
 
 /**
- * Save notification entries to .bpro/config.yaml.
+ * Save notification entries to .fugue/config.yaml.
  */
-export function saveNotifications(bproPath: string, entries: NotificationEntry[]): void {
-  const configPath = path.join(bproPath, 'config.yaml');
+export function saveNotifications(fuguePath: string, entries: NotificationEntry[]): void {
+  const configPath = path.join(fuguePath, 'config.yaml');
   const content = fs.readFileSync(configPath, 'utf-8');
   const config = loadYaml<Record<string, unknown>>(configPath) ?? {};
   config.notifications = entries;
@@ -58,12 +58,12 @@ export function saveNotifications(bproPath: string, entries: NotificationEntry[]
  * Emit a notification event to all registered plugins that listen for it.
  */
 export async function emitEvent(
-  bproPath: string,
+  fuguePath: string,
   event: NotificationEvent,
   message: string,
   details?: Record<string, unknown>,
 ): Promise<void> {
-  const entries = loadNotifications(bproPath);
+  const entries = loadNotifications(fuguePath);
   if (entries.length === 0) return;
 
   const { SlackPlugin } = await import('./slack.js');

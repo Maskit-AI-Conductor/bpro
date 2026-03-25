@@ -1,7 +1,7 @@
-# bpro internal
-.bpro/models/*.key
-.bpro/models/*.token
-.bpro/.credentials/
+# fugue internal
+.fugue/models/*.key
+.fugue/models/*.token
+.fugue/.credentials/
 
 # Python
 __pycache__/

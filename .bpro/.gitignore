@@ -1,0 +1,3 @@
+# bpro credentials — never commit API keys
+models.yaml
+.credentials/

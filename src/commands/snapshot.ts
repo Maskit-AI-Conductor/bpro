@@ -1,17 +1,17 @@
 /**
- * bpro snapshot — Conductor-based reverse-engineering with staging area.
+ * fugue snapshot — Conductor-based reverse-engineering with staging area.
  *
  * Workflow:
  * 1. conductor analyzes project structure + code
  * 2. aiops assigns models to generated agent roles
  * 3. domain-analyst agents extract REQs per domain
- * 4. results saved to .bpro/staging/ (pending)
+ * 4. results saved to .fugue/staging/ (pending)
  *
  * Subcommands:
- *   bpro snapshot          — run analysis, save to staging
- *   bpro snapshot review   — diff staging vs specs
- *   bpro snapshot apply    — promote staging to specs
- *   bpro snapshot discard  — delete staging
+ *   fugue snapshot          — run analysis, save to staging
+ *   fugue snapshot review   — diff staging vs specs
+ *   fugue snapshot apply    — promote staging to specs
+ *   fugue snapshot discard  — delete staging
  */
 
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  requireBproDir,
+  requireFugueDir,
   loadConfig,
   loadModels,
   loadSpecs,
@@ -99,19 +99,19 @@ snapshotCommand
 
 async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
   try {
-    const bproDir = requireBproDir();
-    const config = loadConfig(bproDir);
-    const registry = loadModels(bproDir);
-    const root = path.dirname(bproDir);
+    const fugueDir = requireFugueDir();
+    const config = loadConfig(fugueDir);
+    const registry = loadModels(fugueDir);
+    const root = path.dirname(fugueDir);
 
     // Warn if staging already has data
-    if (hasStagingData(bproDir)) {
+    if (hasStagingData(fugueDir)) {
       printWarning('Staging area already has pending data. It will be overwritten.');
     }
 
     // --clean: clear existing specs first
     if (opts.clean) {
-      const specsDir = path.join(bproDir, 'specs');
+      const specsDir = path.join(fugueDir, 'specs');
       if (fs.existsSync(specsDir)) {
         const files = fs.readdirSync(specsDir).filter((f) => f.endsWith('.yaml'));
         for (const f of files) fs.unlinkSync(path.join(specsDir, f));
@@ -120,7 +120,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
     }
 
     // Clear any previous staging
-    clearStaging(bproDir);
+    clearStaging(fugueDir);
 
     // 1. Get conductor
     const conductorAdapter = getConductorAdapter(config.conductor, registry);
@@ -130,7 +130,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
     // 2. Scan files
     const files = scanFiles(root, config);
     if (files.length === 0) {
-      printError('No source files found. Check scan.include in .bpro/config.yaml');
+      printError('No source files found. Check scan.include in .fugue/config.yaml');
       process.exit(1);
     }
     console.log(`${chalk.blue('>')} Found ${chalk.bold(String(files.length))} source files`);
@@ -180,7 +180,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
     }
 
     // Log conductor
-    appendAgentLog(bproDir, {
+    appendAgentLog(fugueDir, {
       agent: 'conductor',
       action: 'snapshot-analysis',
       model: conductorAdapter.name,
@@ -203,7 +203,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
     // Save agent definitions
     for (const a of assignments) {
       const role = analysis.agent_roles.find((r) => r.name === a.agentName);
-      saveAgentDef(bproDir, {
+      saveAgentDef(fugueDir, {
         name: a.agentName,
         type: a.agentType,
         scope: role?.scope ?? '',
@@ -289,7 +289,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
         chalk.dim(`    ${completedDomains}/${totalDomains} domains | ${allReqs.length} REQs so far`)
       );
 
-      appendAgentLog(bproDir, {
+      appendAgentLog(fugueDir, {
         agent: domainAnalyst?.agentName ?? 'domain-analyst',
         action: 'extract-requirements',
         model: adapterName,
@@ -341,7 +341,7 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
 
     // 8. Save to staging — Step 4/4
     for (const req of allReqs) {
-      saveStagingSpec(bproDir, req);
+      saveStagingSpec(fugueDir, req);
     }
 
     const meta: StagingMeta = {
@@ -350,24 +350,24 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
       model_assignments: modelAssignmentsForMeta,
       total_reqs: allReqs.length,
     };
-    saveStagingMeta(bproDir, meta);
+    saveStagingMeta(fugueDir, meta);
 
     console.log();
     console.log(`${chalk.green('\u2714')} Step 4/4: ${allReqs.length} REQs saved to staging`);
 
     // 9. Show staging summary
-    const diff = diffStagingVsSpecs(bproDir);
+    const diff = diffStagingVsSpecs(fugueDir);
     printDiffSummary(diff);
 
     console.log();
     console.log(`  ${chalk.bold('Next:')}`);
-    console.log(`    ${chalk.cyan('bpro snapshot review')}   \u2014 review changes one by one`);
-    console.log(`    ${chalk.cyan('bpro snapshot apply')}    \u2014 accept all changes`);
-    console.log(`    ${chalk.cyan('bpro snapshot discard')}  \u2014 discard and keep current`);
+    console.log(`    ${chalk.cyan('fugue snapshot review')}   \u2014 review changes one by one`);
+    console.log(`    ${chalk.cyan('fugue snapshot apply')}    \u2014 accept all changes`);
+    console.log(`    ${chalk.cyan('fugue snapshot discard')}  \u2014 discard and keep current`);
     console.log();
 
     // Emit notification
-    await emitEvent(bproDir, 'snapshot.complete', `Snapshot complete: ${allReqs.length} REQs extracted`, {
+    await emitEvent(fugueDir, 'snapshot.complete', `Snapshot complete: ${allReqs.length} REQs extracted`, {
       'REQs': String(allReqs.length),
       'Conductor': conductorAdapter.name,
     });
@@ -383,14 +383,14 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
 
 async function runReview(): Promise<void> {
   try {
-    const bproDir = requireBproDir();
+    const fugueDir = requireFugueDir();
 
-    if (!hasStagingData(bproDir)) {
-      printError('No staging data found. Run `bpro snapshot` first.');
+    if (!hasStagingData(fugueDir)) {
+      printError('No staging data found. Run `fugue snapshot` first.');
       process.exit(1);
     }
 
-    const meta = loadStagingMeta(bproDir);
+    const meta = loadStagingMeta(fugueDir);
     if (meta) {
       console.log();
       console.log(`  ${chalk.bold('Staging Info')}`);
@@ -399,7 +399,7 @@ async function runReview(): Promise<void> {
       console.log(`  Total:     ${meta.total_reqs} REQs`);
     }
 
-    const diff = diffStagingVsSpecs(bproDir);
+    const diff = diffStagingVsSpecs(fugueDir);
     printDiffSummary(diff);
 
     // Show details per entry
@@ -436,9 +436,9 @@ async function runReview(): Promise<void> {
 
     console.log();
     console.log(`  ${chalk.bold('Actions:')}`);
-    console.log(`    ${chalk.cyan('bpro snapshot apply')}    \u2014 accept changes`);
-    console.log(`    ${chalk.cyan('bpro snapshot apply --force')}  \u2014 also overwrite PROTECTED`);
-    console.log(`    ${chalk.cyan('bpro snapshot discard')}  \u2014 discard staging`);
+    console.log(`    ${chalk.cyan('fugue snapshot apply')}    \u2014 accept changes`);
+    console.log(`    ${chalk.cyan('fugue snapshot apply --force')}  \u2014 also overwrite PROTECTED`);
+    console.log(`    ${chalk.cyan('fugue snapshot discard')}  \u2014 discard staging`);
     console.log();
   } catch (err: unknown) {
     printError(err instanceof Error ? err.message : String(err));
@@ -452,14 +452,14 @@ async function runReview(): Promise<void> {
 
 async function runApply(opts: { force?: boolean }): Promise<void> {
   try {
-    const bproDir = requireBproDir();
+    const fugueDir = requireFugueDir();
 
-    if (!hasStagingData(bproDir)) {
-      printError('No staging data found. Run `bpro snapshot` first.');
+    if (!hasStagingData(fugueDir)) {
+      printError('No staging data found. Run `fugue snapshot` first.');
       process.exit(1);
     }
 
-    const diff = diffStagingVsSpecs(bproDir);
+    const diff = diffStagingVsSpecs(fugueDir);
     const force = opts.force ?? false;
 
     let added = 0;
@@ -472,14 +472,14 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
       switch (entry.status) {
         case 'NEW':
           if (entry.stagingSpec) {
-            saveSpec(bproDir, entry.stagingSpec);
+            saveSpec(fugueDir, entry.stagingSpec);
             added++;
           }
           break;
 
         case 'CHANGED':
           if (entry.stagingSpec) {
-            saveSpec(bproDir, entry.stagingSpec);
+            saveSpec(fugueDir, entry.stagingSpec);
             changed++;
           }
           break;
@@ -490,7 +490,7 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
 
         case 'PROTECTED':
           if (force && entry.stagingSpec) {
-            saveSpec(bproDir, entry.stagingSpec);
+            saveSpec(fugueDir, entry.stagingSpec);
             changed++;
             printWarning(`Force-overwritten PROTECTED: ${entry.id} (${entry.existingSpec?.status})`);
           } else {
@@ -509,11 +509,11 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
               skipped++;
               printInfo(`Kept PROTECTED: ${entry.id} (${entry.existingSpec.status})`);
             } else if (isProtected && force) {
-              deleteSpec(bproDir, entry.id);
+              deleteSpec(fugueDir, entry.id);
               removed++;
               printWarning(`Force-removed PROTECTED: ${entry.id}`);
             } else {
-              deleteSpec(bproDir, entry.id);
+              deleteSpec(fugueDir, entry.id);
               removed++;
             }
           }
@@ -522,7 +522,7 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
     }
 
     // Rebuild matrix from final specs
-    const finalSpecs = loadSpecs(bproDir);
+    const finalSpecs = loadSpecs(fugueDir);
     const matrix: TraceMatrix = {
       version: 1,
       created: new Date().toISOString(),
@@ -530,10 +530,10 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
         finalSpecs.map((r) => [r.id, { code_refs: r.code_refs ?? [], test_refs: r.test_refs ?? [] }]),
       ),
     };
-    saveMatrix(bproDir, matrix);
+    saveMatrix(fugueDir, matrix);
 
     // Clear staging
-    clearStaging(bproDir);
+    clearStaging(fugueDir);
 
     console.log();
     printSuccess('Staging applied to specs');
@@ -556,15 +556,15 @@ async function runApply(opts: { force?: boolean }): Promise<void> {
 
 async function runDiscard(): Promise<void> {
   try {
-    const bproDir = requireBproDir();
+    const fugueDir = requireFugueDir();
 
-    if (!hasStagingData(bproDir)) {
+    if (!hasStagingData(fugueDir)) {
       printInfo('No staging data to discard.');
       return;
     }
 
-    const stagingSpecs = loadStagingSpecs(bproDir);
-    clearStaging(bproDir);
+    const stagingSpecs = loadStagingSpecs(fugueDir);
+    clearStaging(fugueDir);
 
     printSuccess(`Discarded ${stagingSpecs.length} staged REQs`);
     console.log(`  ${chalk.dim('Existing specs are unchanged.')}`);

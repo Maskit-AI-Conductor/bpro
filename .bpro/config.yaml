@@ -1,0 +1,28 @@
+version: 2
+project_name: bpro
+scan:
+  include:
+    - '**/*.py'
+    - '**/*.ts'
+    - '**/*.tsx'
+    - '**/*.js'
+    - '**/*.jsx'
+    - '**/*.go'
+    - '**/*.rs'
+    - '**/*.java'
+    - '**/*.kt'
+  exclude:
+    - '**/node_modules/**'
+    - '**/.venv/**'
+    - '**/venv/**'
+    - '**/dist/**'
+    - '**/build/**'
+    - '**/__pycache__/**'
+    - '**/.bpro/**'
+    - '**/.git/**'
+created: '2026-03-25T00:20:35.309Z'
+conductor: ollama:qwen2.5:7b
+plan:
+  source: plans/requirements-v0_2026-03-25T00-20-47.md
+  imported_at: '2026-03-25T00:20:47.672Z'
+  original_path: /Users/baehoyeon/Documents/bpro/docs/requirements-v0.md

@@ -31,10 +31,10 @@ export interface AgentDefinition {
 }
 
 /**
- * Save an agent definition to .bpro/agents/
+ * Save an agent definition to .fugue/agents/
  */
-export function saveAgentDef(bproPath: string, def: AgentDefinition): void {
-  const agentsDir = path.join(bproPath, 'agents');
+export function saveAgentDef(fuguePath: string, def: AgentDefinition): void {
+  const agentsDir = path.join(fuguePath, 'agents');
   fs.mkdirSync(agentsDir, { recursive: true });
   saveYaml(path.join(agentsDir, `${def.name}.yaml`), def);
 }
@@ -42,8 +42,8 @@ export function saveAgentDef(bproPath: string, def: AgentDefinition): void {
 /**
  * Load all agent definitions.
  */
-export function loadAgentDefs(bproPath: string): AgentDefinition[] {
-  const agentsDir = path.join(bproPath, 'agents');
+export function loadAgentDefs(fuguePath: string): AgentDefinition[] {
+  const agentsDir = path.join(fuguePath, 'agents');
   if (!fs.existsSync(agentsDir)) return [];
 
   const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.yaml')).sort();
@@ -64,8 +64,8 @@ export function loadAgentDefs(bproPath: string): AgentDefinition[] {
 /**
  * Append a log entry for an agent.
  */
-export function appendAgentLog(bproPath: string, log: AgentLog): void {
-  const logsDir = path.join(bproPath, 'logs');
+export function appendAgentLog(fuguePath: string, log: AgentLog): void {
+  const logsDir = path.join(fuguePath, 'logs');
   fs.mkdirSync(logsDir, { recursive: true });
 
   const logFile = path.join(logsDir, `${log.agent}.jsonl`);
@@ -76,8 +76,8 @@ export function appendAgentLog(bproPath: string, log: AgentLog): void {
 /**
  * Read logs for a specific agent.
  */
-export function readAgentLogs(bproPath: string, agentName: string): AgentLog[] {
-  const logFile = path.join(bproPath, 'logs', `${agentName}.jsonl`);
+export function readAgentLogs(fuguePath: string, agentName: string): AgentLog[] {
+  const logFile = path.join(fuguePath, 'logs', `${agentName}.jsonl`);
   if (!fs.existsSync(logFile)) return [];
 
   const content = fs.readFileSync(logFile, 'utf-8');
@@ -88,8 +88,8 @@ export function readAgentLogs(bproPath: string, agentName: string): AgentLog[] {
 /**
  * List all agents that have logs.
  */
-export function listLoggedAgents(bproPath: string): string[] {
-  const logsDir = path.join(bproPath, 'logs');
+export function listLoggedAgents(fuguePath: string): string[] {
+  const logsDir = path.join(fuguePath, 'logs');
   if (!fs.existsSync(logsDir)) return [];
 
   return fs.readdirSync(logsDir)

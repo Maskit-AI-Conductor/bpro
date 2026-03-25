@@ -95,7 +95,7 @@ export function findModel(registry: ModelsRegistry, name: string): ModelEntry | 
 export function getAdapter(registry: ModelsRegistry, name: string): ModelAdapter {
   const entry = findModel(registry, name);
   if (!entry) {
-    throw new Error(`Model '${name}' not found. Run 'bpro model list' to see registered models.`);
+    throw new Error(`Model '${name}' not found. Run 'fugue model list' to see registered models.`);
   }
   return createAdapter(entry);
 }
@@ -108,7 +108,7 @@ export function getConductorAdapter(
   registry: ModelsRegistry,
 ): ModelAdapter {
   if (!conductorName) {
-    throw new Error('No conductor set. Run `bpro config set conductor <model>`');
+    throw new Error('No conductor set. Run `fugue config set conductor <model>`');
   }
   return getAdapter(registry, conductorName);
 }

@@ -27,7 +27,7 @@ export function assignModels(
   conductorName: string,
 ): ModelAssignment[] {
   if (registry.models.length === 0) {
-    throw new Error('No models registered. Run `bpro model add` first.');
+    throw new Error('No models registered. Run `fugue model add` first.');
   }
 
   const ranked = rankModels(registry);

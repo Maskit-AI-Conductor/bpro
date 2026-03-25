@@ -1,11 +1,11 @@
 /**
- * bpro status — Project overview.
+ * fugue status — Project overview.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  requireBproDir,
+  requireFugueDir,
   loadConfig,
   loadSpecs,
   loadMatrix,
@@ -21,11 +21,11 @@ export const statusCommand = new Command('status')
   .option('--deliverables', 'Show deliverable tree (D.01-D.08)')
   .action(async (opts: { deliverables?: boolean }) => {
     try {
-      const bproDir = requireBproDir();
-      const config = loadConfig(bproDir);
-      const reqs = loadSpecs(bproDir);
-      const matrix = loadMatrix(bproDir);
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const config = loadConfig(fugueDir);
+      const reqs = loadSpecs(fugueDir);
+      const matrix = loadMatrix(fugueDir);
+      const registry = loadModels(fugueDir);
 
       console.log();
       console.log(`  ${chalk.bold(config.project_name || 'unnamed')}`);
@@ -37,8 +37,8 @@ export const statusCommand = new Command('status')
 
       if (reqs.length === 0) {
         printInfo('No requirements yet.');
-        console.log(`  ${chalk.cyan('bpro plan import <file>')}  — start from planning doc`);
-        console.log(`  ${chalk.cyan('bpro snapshot')}            — reverse-engineer code`);
+        console.log(`  ${chalk.cyan('fugue plan import <file>')}  — start from planning doc`);
+        console.log(`  ${chalk.cyan('fugue snapshot')}            — reverse-engineer code`);
         return;
       }
 
@@ -69,13 +69,13 @@ export const statusCommand = new Command('status')
       }
 
       if (opts.deliverables) {
-        const deliverables = buildDeliverables(bproDir, config, reqs, matrix);
+        const deliverables = buildDeliverables(fugueDir, config, reqs, matrix);
         printDeliverableTree(deliverables);
       } else {
         const display = reqs.slice(0, 15);
         printReqTable(display, `Requirements (${reqs.length} total)`);
         if (reqs.length > 15) {
-          console.log(`  ${chalk.dim(`... and ${reqs.length - 15} more. Use \`bpro status --deliverables\` for full view.`)}`);
+          console.log(`  ${chalk.dim(`... and ${reqs.length - 15} more. Use \`fugue status --deliverables\` for full view.`)}`);
         }
       }
       console.log();

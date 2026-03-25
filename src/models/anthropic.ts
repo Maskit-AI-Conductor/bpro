@@ -74,7 +74,7 @@ export class AnthropicAdapter implements ModelAdapter {
       : prompt;
 
     // Write prompt to temp file to avoid stdin pipe issues with large prompts
-    const tmpFile = path.join(os.tmpdir(), `bpro-prompt-${Date.now()}.txt`);
+    const tmpFile = path.join(os.tmpdir(), `fugue-prompt-${Date.now()}.txt`);
     fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
 
     try {

@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import type { BproConfig, ReqSpec, TraceMatrix } from './project.js';
+import type { FugueConfig, ReqSpec, TraceMatrix } from './project.js';
 import { countByStatus } from './requirements.js';
 import { getMatrixCoverage } from './matrix.js';
 
@@ -15,8 +15,8 @@ export interface Deliverable {
 }
 
 export function buildDeliverables(
-  bproPath: string,
-  config: BproConfig,
+  fuguePath: string,
+  config: FugueConfig,
   reqs: ReqSpec[],
   matrix: TraceMatrix | null,
 ): Record<string, Deliverable> {
@@ -28,7 +28,7 @@ export function buildDeliverables(
   const hasConfirmed = confirmed > 0;
 
   // Check audit reports
-  const reportsDir = path.join(bproPath, 'reports');
+  const reportsDir = path.join(fuguePath, 'reports');
   let hasAudit = false;
   if (fs.existsSync(reportsDir)) {
     hasAudit = fs.readdirSync(reportsDir).some((f) => f.startsWith('audit-'));

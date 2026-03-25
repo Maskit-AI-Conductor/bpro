@@ -1,12 +1,12 @@
-# Contributing to bpro
+# Contributing to fugue
 
-Thank you for considering contributing to bpro!
+Thank you for considering contributing to fugue!
 
 ## How to Contribute
 
 ### Reporting Issues
 
-Open a [GitHub Issue](https://github.com/Maskit-AI-Conductor/bpro/issues) with:
+Open a [GitHub Issue](https://github.com/Maskit-AI-Conductor/fugue/issues) with:
 - What you expected
 - What actually happened
 - Steps to reproduce
@@ -17,7 +17,7 @@ Open a [GitHub Issue](https://github.com/Maskit-AI-Conductor/bpro/issues) with:
 1. Fork the repo
 2. Create a feature branch (`git checkout -b feat/my-feature`)
 3. Make your changes
-4. Run tests (`bpro test run`)
+4. Run tests (`fugue test run`)
 5. Commit with a clear message
 6. Open a PR against `main`
 

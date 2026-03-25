@@ -1,5 +1,5 @@
 /**
- * bpro plan — Forward path: planning doc -> REQ IDs -> development.
+ * fugue plan — Forward path: planning doc -> REQ IDs -> development.
  */
 
 import fs from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import {
-  requireBproDir,
+  requireFugueDir,
   loadConfig,
   saveConfig,
   loadModels,
@@ -29,7 +29,7 @@ planCommand
   .description('Import a planning document (Markdown)')
   .action(async (file: string) => {
     try {
-      const bproDir = requireBproDir();
+      const fugueDir = requireFugueDir();
       const srcPath = path.resolve(file);
 
       if (!fs.existsSync(srcPath)) {
@@ -42,26 +42,26 @@ planCommand
         printWarning(`Expected Markdown file, got ${ext}. Importing anyway.`);
       }
 
-      // Copy to .bpro/plans/
+      // Copy to .fugue/plans/
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const destName = `${path.parse(srcPath).name}_${timestamp}${ext}`;
-      const destPath = path.join(bproDir, 'plans', destName);
-      fs.mkdirSync(path.join(bproDir, 'plans'), { recursive: true });
+      const destPath = path.join(fugueDir, 'plans', destName);
+      fs.mkdirSync(path.join(fugueDir, 'plans'), { recursive: true });
       fs.copyFileSync(srcPath, destPath);
 
       // Update config
-      const config = loadConfig(bproDir);
+      const config = loadConfig(fugueDir);
       if (!config.plan) config.plan = {};
-      config.plan.source = path.relative(bproDir, destPath);
+      config.plan.source = path.relative(fugueDir, destPath);
       config.plan.imported_at = new Date().toISOString();
       config.plan.original_path = srcPath;
-      saveConfig(bproDir, config);
+      saveConfig(fugueDir, config);
 
       const lineCount = fs.readFileSync(destPath, 'utf-8').split('\n').length;
       printSuccess(`Imported ${path.basename(srcPath)} (${lineCount} lines)`);
-      console.log(`  ${chalk.dim(`Saved to .bpro/plans/${destName}`)}`);
+      console.log(`  ${chalk.dim(`Saved to .fugue/plans/${destName}`)}`);
       console.log();
-      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan('bpro plan decompose')} — extract REQ IDs`);
+      console.log(`  ${chalk.dim('Next:')} ${chalk.cyan('fugue plan decompose')} — extract REQ IDs`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -73,17 +73,17 @@ planCommand
   .description('Decompose planning doc into REQ IDs using conductor model')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const config = loadConfig(bproDir);
-      const registry = loadModels(bproDir);
+      const fugueDir = requireFugueDir();
+      const config = loadConfig(fugueDir);
+      const registry = loadModels(fugueDir);
 
       const planSource = config.plan?.source;
       if (!planSource) {
-        printError('No planning doc imported. Run `bpro plan import <file>` first.');
+        printError('No planning doc imported. Run `fugue plan import <file>` first.');
         process.exit(1);
       }
 
-      const docPath = path.join(bproDir, planSource);
+      const docPath = path.join(fugueDir, planSource);
       if (!fs.existsSync(docPath)) {
         printError(`Planning doc not found: ${docPath}`);
         process.exit(1);
@@ -146,14 +146,14 @@ planCommand
             section: String(raw.source_section ?? ''),
           },
         };
-        saveSpec(bproDir, req);
+        saveSpec(fugueDir, req);
         saved.push(req);
       }
 
       console.log();
       printReqTable(saved, `Requirements (${saved.length})`);
       console.log();
-      console.log(`  ${chalk.dim('Review the REQs above, then:')} ${chalk.cyan('bpro plan confirm')}`);
+      console.log(`  ${chalk.dim('Review the REQs above, then:')} ${chalk.cyan('fugue plan confirm')}`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -165,8 +165,8 @@ planCommand
   .description('Confirm all DRAFT REQs and start development phase')
   .action(async () => {
     try {
-      const bproDir = requireBproDir();
-      const reqs = loadSpecs(bproDir);
+      const fugueDir = requireFugueDir();
+      const reqs = loadSpecs(fugueDir);
       const draftReqs = reqs.filter((r) => r.status === 'DRAFT');
 
       if (draftReqs.length === 0) {
@@ -198,18 +198,18 @@ planCommand
       for (const req of draftReqs) {
         req.status = 'CONFIRMED';
         req.confirmed_at = now;
-        saveSpec(bproDir, req);
+        saveSpec(fugueDir, req);
       }
 
       // Create traceability matrix
       const matrix = createEmptyMatrix(draftReqs);
-      saveMatrix(bproDir, matrix);
+      saveMatrix(fugueDir, matrix);
 
       printSuccess(`${draftReqs.length} REQs confirmed. Development phase started.`);
       console.log();
       console.log(`  ${chalk.dim('Next:')}`);
-      console.log(`  ${chalk.cyan('bpro status')}            — check progress`);
-      console.log(`  ${chalk.cyan('bpro audit --quick')}     — run first audit`);
+      console.log(`  ${chalk.cyan('fugue status')}            — check progress`);
+      console.log(`  ${chalk.cyan('fugue audit --quick')}     — run first audit`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);

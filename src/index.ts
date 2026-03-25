@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * bpro — Beyond Prototype. Conductor-based AI PMO for your terminal.
+ * fugue — Fugue. Conductor-based AI PMO for your terminal.
  */
 
 import { Command } from 'commander';
@@ -21,9 +21,9 @@ import { taskCommand } from './commands/task.js';
 const program = new Command();
 
 program
-  .name('bpro')
-  .description('Beyond Prototype — Conductor-based AI PMO for your terminal')
-  .version('0.2.0');
+  .name('fugue')
+  .description('Fugue — Conductor-based AI PMO for your terminal')
+  .version('0.3.0');
 
 program.addCommand(initCommand);
 program.addCommand(modelCommand);

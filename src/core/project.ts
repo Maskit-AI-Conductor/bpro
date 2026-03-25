@@ -1,12 +1,12 @@
 /**
- * Project management — .bpro/ directory operations.
+ * Project management — .fugue/ directory operations.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadYaml, saveYaml } from '../utils/yaml.js';
 
-export const BPRO_DIR = '.bpro';
+export const FUGUE_DIR = '.fugue';
 export const CONFIG_FILE = 'config.yaml';
 export const MODELS_FILE = 'models.yaml';
 
@@ -23,7 +23,7 @@ export const SUBDIRS = [
   'tasks',
 ];
 
-export interface BproConfig {
+export interface FugueConfig {
   version: number;
   project_name: string;
   conductor?: string;
@@ -57,7 +57,7 @@ export interface ModelEntry {
   added_at: string;
 }
 
-export const DEFAULT_CONFIG: BproConfig = {
+export const DEFAULT_CONFIG: FugueConfig = {
   version: 2,
   project_name: '',
   scan: {
@@ -68,32 +68,32 @@ export const DEFAULT_CONFIG: BproConfig = {
     exclude: [
       '**/node_modules/**', '**/.venv/**', '**/venv/**',
       '**/dist/**', '**/build/**', '**/__pycache__/**',
-      '**/.bpro/**', '**/.git/**',
+      '**/.fugue/**', '**/.git/**',
     ],
   },
   created: '',
 };
 
-const GITIGNORE_CONTENT = `# bpro credentials — never commit API keys
+const GITIGNORE_CONTENT = `# fugue credentials — never commit API keys
 models.yaml
 .credentials/
 `;
 
 /**
- * Walk up from start to find .bpro/ directory.
+ * Walk up from start to find .fugue/ directory.
  */
 export function findProjectRoot(start?: string): string | null {
   let current = start ?? process.cwd();
   const { root } = path.parse(current);
 
   while (true) {
-    if (fs.existsSync(path.join(current, BPRO_DIR))) {
+    if (fs.existsSync(path.join(current, FUGUE_DIR))) {
       return current;
     }
     const parent = path.dirname(current);
     if (parent === current || parent === root) {
       // Check root too
-      if (fs.existsSync(path.join(root, BPRO_DIR))) {
+      if (fs.existsSync(path.join(root, FUGUE_DIR))) {
         return root;
       }
       return null;
@@ -103,79 +103,79 @@ export function findProjectRoot(start?: string): string | null {
 }
 
 /**
- * Get .bpro/ path if project exists.
+ * Get .fugue/ path if project exists.
  */
-export function getBproDir(start?: string): string | null {
+export function getFugueDir(start?: string): string | null {
   const root = findProjectRoot(start);
-  return root ? path.join(root, BPRO_DIR) : null;
+  return root ? path.join(root, FUGUE_DIR) : null;
 }
 
 /**
- * Require .bpro/ to exist, or throw.
+ * Require .fugue/ to exist, or throw.
  */
-export function requireBproDir(start?: string): string {
-  const dir = getBproDir(start);
+export function requireFugueDir(start?: string): string {
+  const dir = getFugueDir(start);
   if (!dir) {
-    throw new Error('Not a bpro project. Run `bpro init` first.');
+    throw new Error('Not a fugue project. Run `fugue init` first.');
   }
   return dir;
 }
 
 /**
- * Initialize .bpro/ directory with default structure.
+ * Initialize .fugue/ directory with default structure.
  */
 export function initProject(rootPath?: string, force = false): string {
   const root = rootPath ?? process.cwd();
-  const bproPath = path.join(root, BPRO_DIR);
+  const fuguePath = path.join(root, FUGUE_DIR);
 
-  if (fs.existsSync(bproPath) && !force) {
-    throw new Error(`.bpro/ already exists at ${root}`);
+  if (fs.existsSync(fuguePath) && !force) {
+    throw new Error(`.fugue/ already exists at ${root}`);
   }
 
-  fs.mkdirSync(bproPath, { recursive: true });
+  fs.mkdirSync(fuguePath, { recursive: true });
   for (const subdir of SUBDIRS) {
-    fs.mkdirSync(path.join(bproPath, subdir), { recursive: true });
+    fs.mkdirSync(path.join(fuguePath, subdir), { recursive: true });
   }
 
-  const config: BproConfig = {
+  const config: FugueConfig = {
     ...DEFAULT_CONFIG,
     project_name: path.basename(root),
     created: new Date().toISOString(),
   };
-  saveConfig(bproPath, config);
+  saveConfig(fuguePath, config);
 
   // Initialize empty models registry
   const modelsRegistry: ModelsRegistry = {
     version: 1,
     models: [],
   };
-  saveModels(bproPath, modelsRegistry);
+  saveModels(fuguePath, modelsRegistry);
 
   // .gitignore for credential protection
-  fs.writeFileSync(path.join(bproPath, '.gitignore'), GITIGNORE_CONTENT, 'utf-8');
+  fs.writeFileSync(path.join(fuguePath, '.gitignore'), GITIGNORE_CONTENT, 'utf-8');
 
-  return bproPath;
+  return fuguePath;
 }
 
 // --- Config ---
 
-export function loadConfig(bproPath: string): BproConfig {
-  const configPath = path.join(bproPath, CONFIG_FILE);
-  return loadYaml<BproConfig>(configPath) ?? { ...DEFAULT_CONFIG };
+export function loadConfig(fuguePath: string): FugueConfig {
+  const configPath = path.join(fuguePath, CONFIG_FILE);
+  return loadYaml<FugueConfig>(configPath) ?? { ...DEFAULT_CONFIG };
 }
 
-export function saveConfig(bproPath: string, config: BproConfig): void {
-  saveYaml(path.join(bproPath, CONFIG_FILE), config);
+export function saveConfig(fuguePath: string, config: FugueConfig): void {
+  saveYaml(path.join(fuguePath, CONFIG_FILE), config);
 }
 
 // --- Models ---
 
-export function loadModels(bproPath: string): ModelsRegistry {
-  const modelsPath = path.join(bproPath, MODELS_FILE);
+export function loadModels(fuguePath: string): ModelsRegistry {
+  const modelsPath = path.join(fuguePath, MODELS_FILE);
   return loadYaml<ModelsRegistry>(modelsPath) ?? { version: 1, models: [] };
 }
 
-export function saveModels(bproPath: string, registry: ModelsRegistry): void {
+export function saveModels(fuguePath: string, registry: ModelsRegistry): void {
   // Strip api_key from saved models if env var is set
   const safeRegistry: ModelsRegistry = {
     ...registry,
@@ -188,14 +188,14 @@ export function saveModels(bproPath: string, registry: ModelsRegistry): void {
       return entry;
     }),
   };
-  saveYaml(path.join(bproPath, MODELS_FILE), safeRegistry);
+  saveYaml(path.join(fuguePath, MODELS_FILE), safeRegistry);
 }
 
 /**
  * Save models WITHOUT redacting keys (for internal use).
  */
-export function saveModelsRaw(bproPath: string, registry: ModelsRegistry): void {
-  saveYaml(path.join(bproPath, MODELS_FILE), registry);
+export function saveModelsRaw(fuguePath: string, registry: ModelsRegistry): void {
+  saveYaml(path.join(fuguePath, MODELS_FILE), registry);
 }
 
 // --- Specs ---
@@ -219,8 +219,8 @@ export interface ReqSpec {
   [key: string]: unknown;
 }
 
-export function loadSpecs(bproPath: string): ReqSpec[] {
-  const specsDir = path.join(bproPath, 'specs');
+export function loadSpecs(fuguePath: string): ReqSpec[] {
+  const specsDir = path.join(fuguePath, 'specs');
   if (!fs.existsSync(specsDir)) return [];
 
   const files = fs.readdirSync(specsDir)
@@ -235,8 +235,8 @@ export function loadSpecs(bproPath: string): ReqSpec[] {
   return specs;
 }
 
-export function saveSpec(bproPath: string, req: ReqSpec): void {
-  const specsDir = path.join(bproPath, 'specs');
+export function saveSpec(fuguePath: string, req: ReqSpec): void {
+  const specsDir = path.join(fuguePath, 'specs');
   fs.mkdirSync(specsDir, { recursive: true });
   saveYaml(path.join(specsDir, `${req.id}.yaml`), req);
 }
@@ -249,12 +249,12 @@ export interface TraceMatrix {
   entries: Record<string, { code_refs: string[]; test_refs: string[] }>;
 }
 
-export function loadMatrix(bproPath: string): TraceMatrix | null {
-  return loadYaml<TraceMatrix>(path.join(bproPath, 'matrix', 'matrix.yaml'));
+export function loadMatrix(fuguePath: string): TraceMatrix | null {
+  return loadYaml<TraceMatrix>(path.join(fuguePath, 'matrix', 'matrix.yaml'));
 }
 
-export function saveMatrix(bproPath: string, matrix: TraceMatrix): void {
-  const matrixDir = path.join(bproPath, 'matrix');
+export function saveMatrix(fuguePath: string, matrix: TraceMatrix): void {
+  const matrixDir = path.join(fuguePath, 'matrix');
   fs.mkdirSync(matrixDir, { recursive: true });
   saveYaml(path.join(matrixDir, 'matrix.yaml'), matrix);
 }
@@ -268,30 +268,30 @@ export interface StagingMeta {
   total_reqs: number;
 }
 
-export function getStagingDir(bproPath: string): string {
-  return path.join(bproPath, 'staging');
+export function getStagingDir(fuguePath: string): string {
+  return path.join(fuguePath, 'staging');
 }
 
-export function hasStagingData(bproPath: string): boolean {
-  const stagingDir = getStagingDir(bproPath);
+export function hasStagingData(fuguePath: string): boolean {
+  const stagingDir = getStagingDir(fuguePath);
   const metaFile = path.join(stagingDir, '_meta.yaml');
   return fs.existsSync(metaFile);
 }
 
-export function saveStagingSpec(bproPath: string, req: ReqSpec): void {
-  const stagingDir = getStagingDir(bproPath);
+export function saveStagingSpec(fuguePath: string, req: ReqSpec): void {
+  const stagingDir = getStagingDir(fuguePath);
   fs.mkdirSync(stagingDir, { recursive: true });
   saveYaml(path.join(stagingDir, `${req.id}.yaml`), req);
 }
 
-export function saveStagingMeta(bproPath: string, meta: StagingMeta): void {
-  const stagingDir = getStagingDir(bproPath);
+export function saveStagingMeta(fuguePath: string, meta: StagingMeta): void {
+  const stagingDir = getStagingDir(fuguePath);
   fs.mkdirSync(stagingDir, { recursive: true });
   saveYaml(path.join(stagingDir, '_meta.yaml'), meta);
 }
 
-export function loadStagingSpecs(bproPath: string): ReqSpec[] {
-  const stagingDir = getStagingDir(bproPath);
+export function loadStagingSpecs(fuguePath: string): ReqSpec[] {
+  const stagingDir = getStagingDir(fuguePath);
   if (!fs.existsSync(stagingDir)) return [];
 
   const files = fs.readdirSync(stagingDir)
@@ -306,13 +306,13 @@ export function loadStagingSpecs(bproPath: string): ReqSpec[] {
   return specs;
 }
 
-export function loadStagingMeta(bproPath: string): StagingMeta | null {
-  const stagingDir = getStagingDir(bproPath);
+export function loadStagingMeta(fuguePath: string): StagingMeta | null {
+  const stagingDir = getStagingDir(fuguePath);
   return loadYaml<StagingMeta>(path.join(stagingDir, '_meta.yaml'));
 }
 
-export function clearStaging(bproPath: string): void {
-  const stagingDir = getStagingDir(bproPath);
+export function clearStaging(fuguePath: string): void {
+  const stagingDir = getStagingDir(fuguePath);
   if (fs.existsSync(stagingDir)) {
     const files = fs.readdirSync(stagingDir);
     for (const file of files) {
@@ -321,8 +321,8 @@ export function clearStaging(bproPath: string): void {
   }
 }
 
-export function deleteSpec(bproPath: string, reqId: string): void {
-  const specFile = path.join(bproPath, 'specs', `${reqId}.yaml`);
+export function deleteSpec(fuguePath: string, reqId: string): void {
+  const specFile = path.join(fuguePath, 'specs', `${reqId}.yaml`);
   if (fs.existsSync(specFile)) {
     fs.unlinkSync(specFile);
   }
@@ -341,9 +341,9 @@ export interface DiffEntry {
 
 const PROTECTED_STATUSES = ['CONFIRMED', 'DEV', 'DONE'];
 
-export function diffStagingVsSpecs(bproPath: string): DiffEntry[] {
-  const staging = loadStagingSpecs(bproPath);
-  const existing = loadSpecs(bproPath);
+export function diffStagingVsSpecs(fuguePath: string): DiffEntry[] {
+  const staging = loadStagingSpecs(fuguePath);
+  const existing = loadSpecs(fuguePath);
 
   const existingMap = new Map(existing.map((s) => [s.id, s]));
   const stagingMap = new Map(staging.map((s) => [s.id, s]));
@@ -436,15 +436,15 @@ export interface TaskData {
 /**
  * Get tasks directory path.
  */
-export function getTasksDir(bproPath: string): string {
-  return path.join(bproPath, 'tasks');
+export function getTasksDir(fuguePath: string): string {
+  return path.join(fuguePath, 'tasks');
 }
 
 /**
  * Generate the next TASK-NNN ID.
  */
-export function nextTaskId(bproPath: string): string {
-  const tasksDir = getTasksDir(bproPath);
+export function nextTaskId(fuguePath: string): string {
+  const tasksDir = getTasksDir(fuguePath);
   if (!fs.existsSync(tasksDir)) return 'TASK-001';
 
   const files = fs.readdirSync(tasksDir)
@@ -459,10 +459,10 @@ export function nextTaskId(bproPath: string): string {
 }
 
 /**
- * Save a task to .bpro/tasks/TASK-NNN.yaml
+ * Save a task to .fugue/tasks/TASK-NNN.yaml
  */
-export function saveTask(bproPath: string, task: TaskData): void {
-  const tasksDir = getTasksDir(bproPath);
+export function saveTask(fuguePath: string, task: TaskData): void {
+  const tasksDir = getTasksDir(fuguePath);
   fs.mkdirSync(tasksDir, { recursive: true });
   saveYaml(path.join(tasksDir, `${task.id}.yaml`), task);
 }
@@ -470,16 +470,16 @@ export function saveTask(bproPath: string, task: TaskData): void {
 /**
  * Load a single task by ID.
  */
-export function loadTask(bproPath: string, taskId: string): TaskData | null {
-  const filePath = path.join(getTasksDir(bproPath), `${taskId}.yaml`);
+export function loadTask(fuguePath: string, taskId: string): TaskData | null {
+  const filePath = path.join(getTasksDir(fuguePath), `${taskId}.yaml`);
   return loadYaml<TaskData>(filePath);
 }
 
 /**
  * Load all tasks.
  */
-export function loadTasks(bproPath: string): TaskData[] {
-  const tasksDir = getTasksDir(bproPath);
+export function loadTasks(fuguePath: string): TaskData[] {
+  const tasksDir = getTasksDir(fuguePath);
   if (!fs.existsSync(tasksDir)) return [];
 
   const files = fs.readdirSync(tasksDir)

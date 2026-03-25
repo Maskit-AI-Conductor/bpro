@@ -1,4 +1,4 @@
-# bpro Requirements
+# fugue Requirements
 
 요구사항을 도메인별로 분리하여 관리합니다.
 
@@ -23,12 +23,12 @@
 
 ### 요청자-작업자 분리
 
-요청자와 작업자는 **다른 PC에서 작업**할 수 있다. `.bpro/`가 git에 커밋되면 양쪽에서 공유.
+요청자와 작업자는 **다른 PC에서 작업**할 수 있다. `.fugue/`가 git에 커밋되면 양쪽에서 공유.
 
 ```
-요청자 PC: bpro task new → git push
-작업자 PC: git pull → bpro task show → 개발 → bpro task done → git push
-요청자 PC: git pull → bpro task report 확인
+요청자 PC: fugue task new → git push
+작업자 PC: git pull → fugue task show → 개발 → fugue task done → git push
+요청자 PC: git pull → fugue task report 확인
 ```
 
 ## 도메인 목록
