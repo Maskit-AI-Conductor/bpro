@@ -1,121 +1,63 @@
 #!/usr/bin/env node
 
 /**
- * Fugue MCP Server — stdio-based Model Context Protocol server.
+ * Fugue MCP Server — using official @modelcontextprotocol/sdk.
  * Exposes fugue commands as tools for AI coding assistants.
  *
  * Does NOT call any LLM. All analysis is done by the host AI session.
  * This server only handles file I/O (read/write .fugue/ directory).
  */
 
-import { handleRequest, getToolList } from './tools.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { handleRequest } from './tools.js';
 
-let buffer = '';
-
-// Keep process alive — MCP server must stay running until parent kills it
-process.stdin.resume();
-process.stdin.setEncoding('utf-8');
-
-// Prevent Node from exiting when stdin closes (background mode)
-const keepAlive = setInterval(() => {}, 60000);
-process.on('SIGTERM', () => { clearInterval(keepAlive); process.exit(0); });
-process.on('SIGINT', () => { clearInterval(keepAlive); process.exit(0); });
-
-process.stdin.on('data', (chunk: string) => {
-  buffer += chunk;
-
-  // Try to parse complete JSON-RPC messages
-  while (true) {
-    // Look for Content-Length header
-    const headerEnd = buffer.indexOf('\r\n\r\n');
-    if (headerEnd === -1) break;
-
-    const header = buffer.slice(0, headerEnd);
-    const contentLengthMatch = header.match(/Content-Length:\s*(\d+)/i);
-    if (!contentLengthMatch) {
-      buffer = buffer.slice(headerEnd + 4);
-      continue;
-    }
-
-    const contentLength = parseInt(contentLengthMatch[1], 10);
-    const bodyStart = headerEnd + 4;
-
-    if (buffer.length < bodyStart + contentLength) break; // incomplete
-
-    const body = buffer.slice(bodyStart, bodyStart + contentLength);
-    buffer = buffer.slice(bodyStart + contentLength);
-
-    try {
-      const request = JSON.parse(body);
-      handleJsonRpc(request);
-    } catch {
-      // ignore parse errors
-    }
-  }
+const server = new McpServer({
+  name: 'fugue',
+  version: '0.7.0',
 });
 
-// Don't exit on stdin close — wait for SIGTERM
-process.stdin.on('end', () => {
-  // MCP client closed stdin, exit gracefully
-  process.exit(0);
-});
-
-async function handleJsonRpc(request: { id?: unknown; method: string; params?: Record<string, unknown> }) {
-  const { id, method, params } = request;
-
-  try {
-    let result: unknown;
-
-    switch (method) {
-      case 'initialize':
-        result = {
-          protocolVersion: '2024-11-05',
-          capabilities: {
-            tools: {},
-          },
-          serverInfo: {
-            name: 'fugue',
-            version: '0.7.0',
-          },
-        };
-        break;
-
-      case 'notifications/initialized':
-        // No response needed for notifications
-        return;
-
-      case 'tools/list':
-        result = { tools: getToolList() };
-        break;
-
-      case 'tools/call':
-        result = await handleRequest(
-          (params as { name: string }).name,
-          ((params as { arguments?: Record<string, unknown> }).arguments) ?? {},
-        );
-        break;
-
-      default:
-        sendResponse(id, null, { code: -32601, message: `Method not found: ${method}` });
-        return;
-    }
-
-    sendResponse(id, result);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    sendResponse(id, null, { code: -32603, message });
-  }
+// Helper: call handleRequest and return SDK-compatible result
+async function call(name: string, args: Record<string, unknown>) {
+  const result = await handleRequest(name, args);
+  return {
+    content: result.content as Array<{ type: 'text'; text: string }>,
+    isError: result.isError,
+  };
 }
 
-function sendResponse(id: unknown, result: unknown, error?: { code: number; message: string }) {
-  const response: Record<string, unknown> = { jsonrpc: '2.0', id };
-  if (error) {
-    response.error = error;
-  } else {
-    response.result = result;
-  }
+// Register tools with zod schemas
+server.tool('fugue_init', 'Initialize .fugue/ in a project directory', { path: z.string().optional(), force: z.boolean().optional() }, async (args) => call('fugue_init', args));
 
-  const body = JSON.stringify(response);
-  const header = `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n`;
-  process.stdout.write(header + body);
-}
+server.tool('fugue_get_plan', 'Get the imported planning document content', { path: z.string().optional() }, async (args) => call('fugue_get_plan', args));
+
+server.tool('fugue_save_reqs', 'Save requirements to .fugue/specs/', { reqs: z.array(z.object({ id: z.string(), title: z.string(), priority: z.string(), description: z.string(), source_section: z.string().optional() })), path: z.string().optional() }, async (args) => call('fugue_save_reqs', args));
+
+server.tool('fugue_get_specs', 'Get current requirements list', { path: z.string().optional(), status: z.string().optional(), domain: z.string().optional() }, async (args) => call('fugue_get_specs', args));
+
+server.tool('fugue_status', 'Get project status summary', { path: z.string().optional(), deliverables: z.boolean().optional() }, async (args) => call('fugue_status', args));
+
+server.tool('fugue_audit', 'Run audit and get results', { path: z.string().optional(), gate: z.boolean().optional() }, async (args) => call('fugue_audit', args));
+
+server.tool('fugue_feedback', 'Add feedback to a REQ', { reqId: z.string(), action: z.enum(['accept', 'reject', 'comment']), message: z.string().optional(), from: z.string().optional(), path: z.string().optional() }, async (args) => call('fugue_feedback', args));
+
+server.tool('fugue_confirm', 'Confirm accepted REQs, deprecate rejected ones', { path: z.string().optional() }, async (args) => call('fugue_confirm', args));
+
+server.tool('fugue_task_new', 'Create a new task', { title: z.string(), requester: z.string().optional(), path: z.string().optional() }, async (args) => call('fugue_task_new', args));
+
+server.tool('fugue_task_list', 'List all tasks', { path: z.string().optional(), status: z.string().optional() }, async (args) => call('fugue_task_list', args));
+
+server.tool('fugue_diagnose', 'Diagnose project size and methodology', { path: z.string().optional() }, async (args) => call('fugue_diagnose', args));
+
+server.tool('fugue_gate', 'Phase gate scoring', { path: z.string().optional(), phase: z.number().optional() }, async (args) => call('fugue_gate', args));
+
+server.tool('fugue_report', 'Generate HTML progress report', { path: z.string().optional() }, async (args) => call('fugue_report', args));
+
+server.tool('fugue_snapshot_scan', 'Scan project files for snapshot', { path: z.string().optional() }, async (args) => call('fugue_snapshot_scan', args));
+
+server.tool('fugue_snapshot_save', 'Save snapshot results to staging', { reqs: z.array(z.object({ id: z.string(), title: z.string(), priority: z.string(), description: z.string(), code_refs: z.array(z.string()).optional(), domain: z.string().optional() })), agents: z.array(z.object({ name: z.string(), type: z.string(), scope: z.string() })).optional(), path: z.string().optional() }, async (args) => call('fugue_snapshot_save', args));
+
+// Start
+const transport = new StdioServerTransport();
+await server.connect(transport);
