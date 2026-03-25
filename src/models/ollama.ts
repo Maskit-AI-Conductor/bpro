@@ -12,7 +12,7 @@ export class OllamaAdapter implements ModelAdapter {
   private model: string;
   private defaultTimeout: number;
 
-  constructor(name: string, model: string, endpoint = 'http://localhost:11434', timeout = 120) {
+  constructor(name: string, model: string, endpoint = 'http://localhost:11434', timeout = 300) {
     this.name = name;
     this.model = model;
     this.endpoint = endpoint.replace(/\/$/, '');
