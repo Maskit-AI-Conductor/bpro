@@ -79,15 +79,33 @@ export class AnthropicAdapter implements ModelAdapter {
     fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
 
     try {
-      const { stdout } = await execAsync(
-        `cat "${tmpFile}" | claude --print --model ${this.model}`,
-        {
-          encoding: 'utf-8',
-          timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
-          maxBuffer: 50 * 1024 * 1024,
-          shell: '/bin/bash',
-        },
-      );
+      // Try with model flag first, fallback to default model if it fails
+      const modelFlag = this.model ? `--model ${this.model}` : '';
+      let stdout: string;
+      try {
+        const result = await execAsync(
+          `cat "${tmpFile}" | claude --print ${modelFlag}`,
+          {
+            encoding: 'utf-8',
+            timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
+            maxBuffer: 50 * 1024 * 1024,
+            shell: '/bin/bash',
+          },
+        );
+        stdout = result.stdout;
+      } catch {
+        // Fallback: no model flag (use default)
+        const result = await execAsync(
+          `cat "${tmpFile}" | claude --print`,
+          {
+            encoding: 'utf-8',
+            timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
+            maxBuffer: 50 * 1024 * 1024,
+            shell: '/bin/bash',
+          },
+        );
+        stdout = result.stdout;
+      }
       return stdout.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -429,7 +429,8 @@ async function runNewImportStep(
   }
 
   // Run "task import TASK-NNN <file>"
-  const importCmd = `fugue task import ${taskId} ${path.resolve(file)}`;
+  const importCmd = `fugue task import ${taskId} "${path.resolve(file)}"`;
+
   console.log(`  ${chalk.dim('\u2192')} ${chalk.dim(importCmd)}`);
 
   const ok = runActionInteractive(importCmd);

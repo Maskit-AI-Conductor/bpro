@@ -151,7 +151,7 @@ export function actionToCommands(
       // new+import returns two commands; the caller must capture taskId from the first
       return [
         `fugue task new "${title}"${requesterArg}`,
-        `fugue task import ${tid} ${extraArgs?.file ?? ''}`,
+        `fugue task import ${tid} "${extraArgs?.file ?? ''}"`,
       ];
     }
     case 'validate':
