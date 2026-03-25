@@ -352,13 +352,25 @@ function handleGetPlan(args: Record<string, unknown>): ToolResult {
 
 function handleSaveReqs(args: Record<string, unknown>): ToolResult {
   const fugueDir = resolveFugueDir(args.path as string | undefined);
-  const reqInputs = args.reqs as Array<{
+
+  // Handle both array and JSON string input
+  let reqInputs: Array<{
     id: string;
     title: string;
     priority: string;
     description: string;
     source_section?: string;
   }>;
+
+  if (typeof args.reqs === 'string') {
+    try {
+      reqInputs = JSON.parse(args.reqs);
+    } catch {
+      return errorResult('reqs must be a valid JSON array');
+    }
+  } else {
+    reqInputs = args.reqs as typeof reqInputs;
+  }
 
   if (!Array.isArray(reqInputs) || reqInputs.length === 0) {
     return errorResult('reqs must be a non-empty array');

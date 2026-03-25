@@ -32,7 +32,7 @@ server.tool('fugue_init', 'Initialize .fugue/ in a project directory', { path: z
 
 server.tool('fugue_get_plan', 'Get the imported planning document content', { path: z.string().optional() }, async (args) => call('fugue_get_plan', args));
 
-server.tool('fugue_save_reqs', 'Save requirements to .fugue/specs/', { reqs: z.array(z.object({ id: z.string(), title: z.string(), priority: z.string(), description: z.string(), source_section: z.string().optional() })), path: z.string().optional() }, async (args) => call('fugue_save_reqs', args));
+server.tool('fugue_save_reqs', 'Save requirements to .fugue/specs/. reqs is a JSON array string: [{"id":"REQ-001","title":"...","priority":"HIGH","description":"..."}]', { reqs: z.string().describe('JSON array of requirements'), path: z.string().optional() }, async (args) => call('fugue_save_reqs', args));
 
 server.tool('fugue_get_specs', 'Get current requirements list', { path: z.string().optional(), status: z.string().optional(), domain: z.string().optional() }, async (args) => call('fugue_get_specs', args));
 
@@ -56,7 +56,7 @@ server.tool('fugue_report', 'Generate HTML progress report', { path: z.string().
 
 server.tool('fugue_snapshot_scan', 'Scan project files for snapshot', { path: z.string().optional() }, async (args) => call('fugue_snapshot_scan', args));
 
-server.tool('fugue_snapshot_save', 'Save snapshot results to staging', { reqs: z.array(z.object({ id: z.string(), title: z.string(), priority: z.string(), description: z.string(), code_refs: z.array(z.string()).optional(), domain: z.string().optional() })), agents: z.array(z.object({ name: z.string(), type: z.string(), scope: z.string() })).optional(), path: z.string().optional() }, async (args) => call('fugue_snapshot_save', args));
+server.tool('fugue_snapshot_save', 'Save snapshot results to staging. reqs and agents are JSON array strings.', { reqs: z.string().describe('JSON array of requirements'), agents: z.string().optional().describe('JSON array of agent definitions'), path: z.string().optional() }, async (args) => call('fugue_snapshot_save', args));
 
 // Start
 const transport = new StdioServerTransport();

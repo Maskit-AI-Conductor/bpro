@@ -1,0 +1,8 @@
+id: REQ-SNAP-013
+title: PROTECTED 상태
+priority: HIGH
+description: snapshot으로 덮어쓰기 방지
+status: DRAFT
+created: '2026-03-25T14:38:58.994Z'
+code_refs: []
+test_refs: []

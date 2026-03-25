@@ -1,0 +1,8 @@
+id: REQ-MODL-009
+title: conductor 이름
+priority: MEDIUM
+description: config set conductor-name
+status: DRAFT
+created: '2026-03-25T14:38:58.994Z'
+code_refs: []
+test_refs: []

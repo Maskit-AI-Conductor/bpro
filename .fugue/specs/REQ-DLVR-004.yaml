@@ -1,0 +1,8 @@
+id: REQ-DLVR-004
+title: Crosscheck 기본 (3단계)
+priority: HIGH
+description: SUBMIT→AUDIT→REWORK
+status: DRAFT
+created: '2026-03-25T14:38:58.994Z'
+code_refs: []
+test_refs: []

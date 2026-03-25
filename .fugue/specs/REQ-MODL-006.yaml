@@ -1,0 +1,8 @@
+id: REQ-MODL-006
+title: aiops 자동 배정
+priority: MEDIUM
+description: 규칙 기반 역할별 배정
+status: DRAFT
+created: '2026-03-25T14:38:58.994Z'
+code_refs: []
+test_refs: []
