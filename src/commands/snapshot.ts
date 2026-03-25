@@ -252,74 +252,24 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
       domainTasks.push({ domain, adapterName, adapter, files: filesToAnalyze, agentName });
     }
 
-    // Live progress tracking for parallel domain analysis
-    const domainStatus: Array<{
-      name: string;
-      model: string;
-      status: 'queued' | 'running' | 'done' | 'error';
-      batchDone: number;
-      batchTotal: number;
-      reqCount: number;
-      elapsed: number;
-    }> = domainTasks.map(dt => ({
-      name: dt.domain.name,
-      model: dt.adapterName,
-      status: 'queued',
-      batchDone: 0,
-      batchTotal: batchFiles(dt.files).length,
-      reqCount: 0,
-      elapsed: 0,
-    }));
+    // Simple, reliable progress: print each domain as it completes
+    let completedCount = 0;
+    const totalDomainCount = domainTasks.length;
+    const progressLine = () => `    ${chalk.dim(`[${completedCount}/${totalDomainCount} domains]`)}`;
 
-    // Render progress lines
-    function renderProgress(): void {
-      // Move cursor up to overwrite previous render
-      if (renderCount > 0) {
-        process.stdout.write(`\x1b[${domainTasks.length + 1}A`);
-      }
-      for (const ds of domainStatus) {
-        const pct = ds.batchTotal > 0 ? Math.round((ds.batchDone / ds.batchTotal) * 100) : 0;
-        const filled = Math.round(pct / 10);
-        const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
-        const elapsedStr = ds.elapsed > 0 ? formatElapsed(ds.elapsed) : '';
+    // Show initial status
+    process.stdout.write(`    ${chalk.dim(`[0/${totalDomainCount} domains] analyzing...`)}`);
 
-        let icon: string;
-        let detail: string;
-        switch (ds.status) {
-          case 'queued': icon = chalk.dim('○'); detail = chalk.dim('queued'); break;
-          case 'running': icon = chalk.yellow('⠋'); detail = `${chalk.yellow(bar)} ${pct}% (${ds.batchDone}/${ds.batchTotal} batches, ${ds.reqCount} REQs)`; break;
-          case 'done': icon = chalk.green('✔'); detail = `${ds.reqCount} REQs ${chalk.dim(`(${elapsedStr})`)}`; break;
-          case 'error': icon = chalk.red('✖'); detail = chalk.red('failed'); break;
-        }
-        console.log(`    ${icon} ${ds.name.padEnd(18)} ${chalk.dim(`[${ds.model}]`)}  ${detail}`);
-      }
-      const done = domainStatus.filter(d => d.status === 'done' || d.status === 'error').length;
-      const totalReqsSoFar = domainStatus.reduce((sum, d) => sum + d.reqCount, 0);
-      console.log(chalk.dim(`    ${done}/${domainTasks.length} domains | ${totalReqsSoFar} REQs so far`));
-      renderCount++;
-    }
-
-    let renderCount = 0;
-    renderProgress();
-
-    // Start progress refresh interval
-    const progressInterval = setInterval(() => {
-      renderProgress();
-    }, 2000);
-
-    // Run domain analyses in parallel
+    // Run domain analyses in parallel — each prints on completion
     const domainResults = await Promise.allSettled(
-      domainTasks.map(async (dt, idx) => {
+      domainTasks.map(async (dt) => {
         const domainStart = Date.now();
         const batches = batchFiles(dt.files);
         const reqs: ReqSpec[] = [];
 
-        domainStatus[idx].status = 'running';
-        domainStatus[idx].batchTotal = batches.length;
-
-        for (let bi = 0; bi < batches.length; bi++) {
+        for (const batch of batches) {
           try {
-            const batchReqs = await extractRequirements(dt.adapter, batches[bi], 1);
+            const batchReqs = await extractRequirements(dt.adapter, batch, 1);
             if (Array.isArray(batchReqs)) {
               for (const raw of batchReqs) {
                 reqs.push({
@@ -343,27 +293,29 @@ async function runSnapshot(opts: { clean?: boolean }): Promise<void> {
               created: new Date().toISOString(), code_refs: [], test_refs: [],
             });
           }
-          domainStatus[idx].batchDone = bi + 1;
-          domainStatus[idx].reqCount = reqs.filter(r => !r.title.startsWith('[ERROR]')).length;
         }
 
         const elapsed = Date.now() - domainStart;
-        domainStatus[idx].status = 'done';
-        domainStatus[idx].elapsed = elapsed;
-        return { domain: dt.domain, agentName: dt.agentName, adapterName: dt.adapterName, reqs, elapsed, idx };
+        const validReqs = reqs.filter(r => !r.title.startsWith('[ERROR]'));
+        completedCount++;
+
+        // Print completion line immediately
+        process.stdout.write(`\r\x1b[K`); // clear current line
+        const elapsedStr = formatElapsed(elapsed);
+        console.log(`    ${chalk.green('✔')} ${dt.domain.name.padEnd(18)} ${chalk.dim(`[${dt.adapterName}]`)}  ${validReqs.length} REQs ${chalk.dim(`(${elapsedStr})`)}`);
+        process.stdout.write(`    ${chalk.dim(`[${completedCount}/${totalDomainCount} domains] analyzing...`)}`);
+
+        return { domain: dt.domain, agentName: dt.agentName, adapterName: dt.adapterName, reqs, elapsed };
       })
     );
 
-    // Stop progress refresh
-    clearInterval(progressInterval);
+    // Clear the "analyzing..." line
+    process.stdout.write(`\r\x1b[K`);
 
     // Merge results + assign sequential IDs
     const allReqs: ReqSpec[] = [];
     let reqCounter = 1;
     let completedDomains = 0;
-
-    // Final render
-    renderProgress();
 
     for (const result of domainResults) {
       if (result.status === 'fulfilled') {
