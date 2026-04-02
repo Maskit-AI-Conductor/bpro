@@ -3,6 +3,14 @@
  * Supports two modes:
  * 1. Subscription: uses `claude` CLI (no API key needed)
  * 2. API: direct Anthropic API calls (API key required)
+ *
+ * When using subscription mode (CLI), the adapter tries `--bare` first
+ * for fast execution (skips MCP/hooks/plugins). If --bare fails due to
+ * missing API key, it warns the user and falls back to full CLI mode.
+ *
+ * Env vars:
+ *   ANTHROPIC_API_KEY   — enables --bare mode for instant CLI startup
+ *   FUGUE_CLAUDE_FLAGS  — extra flags appended to every `claude --print` call
  */
 
 import { execSync, exec } from 'node:child_process';
@@ -22,6 +30,12 @@ const MODEL_MAP: Record<string, string> = {
   'claude-sonnet': 'claude-sonnet-4-6',
   'claude-haiku': 'claude-haiku-4-5-20251001',
 };
+
+/** Check if an error is an auth/login issue (not an API error) */
+function isAuthError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('Not logged in') || msg.includes('Please run /login');
+}
 
 export class AnthropicAdapter implements ModelAdapter {
   name: string;
@@ -81,30 +95,46 @@ export class AnthropicAdapter implements ModelAdapter {
     fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
 
     const modelFlag = this.model ? `--model ${this.model}` : '';
+    const extraFlags = process.env.FUGUE_CLAUDE_FLAGS?.trim() ?? '';
     const timeoutMs = (options?.timeout ?? this.defaultTimeout) * 1000;
     const execOpts = { encoding: 'utf-8' as const, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024, shell: getShell() };
 
     try {
-      // 1. Try --bare + model (fastest, needs API key)
-      if (process.env.ANTHROPIC_API_KEY) {
-        try {
-          const r = await execAsync(createPipeCommand(tmpFile, `claude --print --bare ${modelFlag}`), execOpts);
-          if (r.stdout.trim()) return r.stdout.trim();
-        } catch { /* fall through */ }
-      }
+      let stdout: string;
 
-      // 2. Try --print + model (subscription mode, may be slow with MCP)
+      // Attempt 1: --bare mode (skips MCP/hooks/plugins — much faster)
       try {
-        const r = await execAsync(createPipeCommand(tmpFile, `claude --print ${modelFlag}`), execOpts);
-        if (r.stdout.trim()) return r.stdout.trim();
-      } catch { /* fall through */ }
+        const cmd = `claude --print --bare ${modelFlag} ${extraFlags}`.replace(/\s+/g, ' ').trim();
+        const r = await execAsync(createPipeCommand(tmpFile, cmd), execOpts);
+        stdout = r.stdout;
+      } catch (bareErr: unknown) {
+        if (isAuthError(bareErr)) {
+          console.error(
+            '\x1b[33m⚠ claude --bare failed: ANTHROPIC_API_KEY not set.\x1b[0m\n'
+            + '  Falling back to full CLI mode (slower — loads MCP servers, hooks, plugins).\n'
+            + '  To fix: export ANTHROPIC_API_KEY="sk-ant-..." in your shell profile.',
+          );
+        }
 
-      // 3. Try --print only (no model flag)
-      const r = await execAsync(createPipeCommand(tmpFile, 'claude --print'), execOpts);
-      return r.stdout.trim();
+        // Attempt 2: full CLI with model flag
+        try {
+          const cmd = `claude --print ${modelFlag} ${extraFlags}`.replace(/\s+/g, ' ').trim();
+          const r = await execAsync(createPipeCommand(tmpFile, cmd), execOpts);
+          stdout = r.stdout;
+        } catch {
+          // Attempt 3: minimal — no model flag, no bare
+          const cmd = `claude --print ${extraFlags}`.trim();
+          const r = await execAsync(createPipeCommand(tmpFile, cmd), execOpts);
+          stdout = r.stdout;
+        }
+      }
+      return stdout.trim();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Claude CLI failed: ${msg}`);
+      const hint = !process.env.ANTHROPIC_API_KEY
+        ? '\n  Hint: Set ANTHROPIC_API_KEY to enable fast --bare mode and avoid MCP initialization delays.'
+        : '';
+      throw new Error(`Claude CLI failed: ${msg}${hint}`);
     } finally {
       try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
     }
