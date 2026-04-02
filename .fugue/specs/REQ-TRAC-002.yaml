@@ -1,0 +1,8 @@
+id: REQ-TRAC-002
+title: 소스 파일 code_refs 자동 매핑
+priority: HIGH
+description: 파싱된 변경 파일 중 소스 코드를 해당 REQ의 code_refs에 자동 추가한다
+status: DRAFT
+created: '2026-04-02T23:35:07.433Z'
+code_refs: []
+test_refs: []

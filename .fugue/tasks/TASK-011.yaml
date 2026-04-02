@@ -1,0 +1,47 @@
+id: TASK-011
+title: Progressive Detail — 자동 상세화 추적 시스템
+requester: CEO
+assignees: []
+status: DECOMPOSED
+created_at: '2026-04-02T22:54:59.725Z'
+updated_at: '2026-04-03T00:00:00.000Z'
+req_ids:
+  - REQ-PDET-001
+  - REQ-PDET-002
+  - REQ-PDET-003
+  - REQ-PDET-004
+  - REQ-PDET-005
+  - REQ-PDET-006
+  - REQ-PDET-007
+  - REQ-PDET-008
+  - REQ-PDET-009
+  - REQ-PDET-010
+  - REQ-PDET-011
+  - REQ-PDET-012
+  - REQ-TRAC-001
+  - REQ-TRAC-002
+  - REQ-TRAC-003
+  - REQ-TRAC-004
+  - REQ-TRAC-005
+  - REQ-TRAC-006
+  - REQ-TRAC-007
+  - REQ-TRAC-008
+  - REQ-TRAC-009
+  - REQ-TRAC-010
+  - REQ-TRAC-011
+  - REQ-TRAC-012
+  - REQ-TRAC-013
+  - REQ-TRAC-014
+  - REQ-TRAC-015
+  - REQ-PMIF-001
+  - REQ-PMIF-002
+  - REQ-PMIF-003
+  - REQ-VRFY-001
+  - REQ-VRFY-002
+  - REQ-VRFY-003
+  - REQ-DCMP-001
+  - REQ-DCMP-002
+  - REQ-DCMP-003
+  - REQ-DCMP-004
+escalations: []
+plan_file: plans/TASK-011_11-traceability-and-change-mgmt_2026-04-02T23-29-38.md

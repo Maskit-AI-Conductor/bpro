@@ -1,0 +1,8 @@
+id: REQ-PDET-007
+title: fugue_enrich MCP 도구
+priority: MEDIUM
+description: 동일 기능을 MCP tool로 노출한다
+status: DRAFT
+created: '2026-04-02T23:35:07.433Z'
+code_refs: []
+test_refs: []

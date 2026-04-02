@@ -1,0 +1,8 @@
+id: REQ-PDET-011
+title: fugue policy import CLI
+priority: MEDIUM
+description: 기존 Policy MD에서 REQ YAML + ai_context를 역추출하는 fugue policy import <file> CLI
+status: DRAFT
+created: '2026-04-02T23:35:07.433Z'
+code_refs: []
+test_refs: []
