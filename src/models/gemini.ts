@@ -7,6 +7,7 @@ import { execSync, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ModelAdapter, GenerateOptions, GenerateResult } from './adapter.js';
 import { parseJsonResponse } from '../utils/json-repair.js';
+import { getShell, createPipeCommand, createTempFilePath } from '../utils/platform.js';
 
 const execAsync = promisify(exec);
 
@@ -29,7 +30,8 @@ export class GeminiAdapter implements ModelAdapter {
   async checkHealth(): Promise<boolean> {
     if (this.subscription) {
       try {
-        execSync('which gemini', { stdio: 'pipe' });
+        const cmd = process.platform === 'win32' ? 'where gemini' : 'which gemini';
+        execSync(cmd, { stdio: 'pipe' });
         return true;
       } catch {
         // Gemini CLI may not exist yet — still register
@@ -63,18 +65,18 @@ export class GeminiAdapter implements ModelAdapter {
       ? `${options.system}\n\n${prompt}`
       : prompt;
 
-    const tmpFile = `/tmp/fugue-gemini-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
+    const tmpFile = createTempFilePath('fugue-gemini');
     const fs = await import('node:fs');
     fs.writeFileSync(tmpFile, fullPrompt, 'utf-8');
 
     try {
       const { stdout } = await execAsync(
-        `cat "${tmpFile}" | gemini --print --model ${this.model}`,
+        createPipeCommand(tmpFile, `gemini --print --model ${this.model}`),
         {
           encoding: 'utf-8',
           timeout: (options?.timeout ?? this.defaultTimeout) * 1000,
           maxBuffer: 50 * 1024 * 1024,
-          shell: '/bin/bash',
+          shell: getShell(),
         },
       );
       return stdout.trim();
