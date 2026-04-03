@@ -24,13 +24,14 @@ import { webCommand } from './commands/web.js';
 import { syncCommand } from './commands/sync.js';
 import { enrichCommand } from './commands/enrich.js';
 import { policyCommand } from './commands/policy.js';
+import { verifyCommand } from './commands/verify.js';
 
 const program = new Command();
 
 program
   .name('fugue')
   .description('Fugue — Conductor-based AI PMO for your terminal')
-  .version('0.8.0');
+  .version('0.9.0');
 
 program.addCommand(initCommand);
 program.addCommand(modelCommand);
@@ -53,6 +54,7 @@ program.addCommand(webCommand);
 program.addCommand(syncCommand);
 program.addCommand(enrichCommand);
 program.addCommand(policyCommand);
+program.addCommand(verifyCommand);
 
 const mcpCommand = new Command('mcp')
   .description('Start MCP server (for AI coding assistants)')

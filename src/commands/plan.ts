@@ -104,7 +104,8 @@ planCommand
 planCommand
   .command('decompose')
   .description('Decompose planning doc into REQ IDs using conductor model')
-  .action(async () => {
+  .option('--dry-run', 'Preview generated REQs without saving (DCMP-003)')
+  .action(async (opts: { dryRun?: boolean }) => {
     try {
       const fugueDir = requireFugueDir();
       const config = loadConfig(fugueDir);
@@ -139,7 +140,12 @@ planCommand
 
       let reqsData: Array<Record<string, unknown>>;
       try {
-        const prompt = buildDecomposePrompt(docContent);
+        // DCMP-004: pass existing CONFIRMED REQs to avoid duplicates
+        const existingReqs = loadSpecs(fugueDir);
+        const confirmedIds = existingReqs
+          .filter(r => r.status === 'CONFIRMED' || r.status === 'DEV' || r.status === 'DONE')
+          .map(r => `${r.id}: ${r.title}`);
+        const prompt = buildDecomposePrompt(docContent, { existingReqIds: confirmedIds });
         const systemPrompt = buildDecomposeSystemPrompt(config);
         reqsData = await adapter.generateJSON<Array<Record<string, unknown>>>(prompt, {
           system: systemPrompt,
@@ -227,17 +233,23 @@ planCommand
         );
       }
 
-      // Save REQs
+      // Save REQs (or preview in dry-run mode)
       const saved: ReqSpec[] = [];
-      for (const req of processedReqs) {
-        saveSpec(fugueDir, req);
-        saved.push(req);
+      if (opts.dryRun) {
+        console.log();
+        printReqTable(processedReqs, `[dry-run] Requirements preview (${processedReqs.length})`);
+        console.log();
+        console.log(chalk.dim('  Dry-run mode: no REQs saved. Remove --dry-run to persist.'));
+      } else {
+        for (const req of processedReqs) {
+          saveSpec(fugueDir, req);
+          saved.push(req);
+        }
+        console.log();
+        printReqTable(saved, `Requirements (${saved.length})`);
+        console.log();
+        console.log(`  ${chalk.dim('Review the REQs above, then:')} ${chalk.cyan('fugue plan confirm')}`);
       }
-
-      console.log();
-      printReqTable(saved, `Requirements (${saved.length})`);
-      console.log();
-      console.log(`  ${chalk.dim('Review the REQs above, then:')} ${chalk.cyan('fugue plan confirm')}`);
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
@@ -486,28 +498,64 @@ planCommand
       }
       console.log();
 
-      // Timeline
-      console.log(`  ${chalk.bold('History')}`);
-      console.log(`  ${chalk.dim('-'.repeat(50))}`);
+      // Progressive Detail info
+      if (req.detail_level !== undefined) {
+        const levelLabel = ['L0 (commit tag)', 'L1 (REQ)', 'L2 (ai_context)', 'L3 (policy)'][req.detail_level] ?? `L${req.detail_level}`;
+        console.log(`  Detail:      ${levelLabel}`);
+      }
+      if (req.task_id) console.log(`  Task:        ${req.task_id}`);
+      if (req.policy_ref) console.log(`  Policy:      ${req.policy_ref}`);
+      if (req.methodology_ref) console.log(`  Method ref:  ${req.methodology_ref}`);
+      console.log();
+
+      // Unified timeline (TRAC-015)
+      console.log(`  ${chalk.bold('Timeline')}`);
+      console.log(`  ${chalk.dim('-'.repeat(60))}`);
+
+      // Collect all events into one array, sort by date
+      interface TimelineEvent { at: string; type: string; detail: string; by?: string }
+      const events: TimelineEvent[] = [];
 
       // Created
-      console.log(`  ${chalk.dim(req.created?.slice(0, 19) ?? '?')}  ${chalk.blue('CREATED')}  status: DRAFT`);
+      if (req.created) events.push({ at: req.created, type: 'CREATED', detail: 'status: DRAFT' });
 
       // Feedback entries
       const feedbackList = (req.feedback as Array<Record<string, string>>) ?? [];
       for (const fb of feedbackList) {
-        const date = fb.at?.slice(0, 19) ?? '?';
-        const actionColor = fb.action === 'accept' ? chalk.green : fb.action === 'reject' ? chalk.red : chalk.blue;
-        const from = fb.from ? chalk.dim(`by ${fb.from}`) : '';
-        console.log(`  ${chalk.dim(date)}  ${actionColor(fb.action.toUpperCase().padEnd(8))}  ${fb.message ?? ''} ${from}`);
+        events.push({
+          at: fb.at ?? req.created ?? '',
+          type: `FEEDBACK:${(fb.action ?? 'comment').toUpperCase()}`,
+          detail: fb.message ?? '',
+          by: fb.from,
+        });
+      }
+
+      // Change history (TRAC-013 data)
+      const historyList = req.history ?? [];
+      for (const h of historyList) {
+        events.push({
+          at: h.at,
+          type: 'CHANGED',
+          detail: `${h.field}: "${h.from}" → "${h.to}"${h.reason ? ` (${h.reason})` : ''}`,
+          by: h.by,
+        });
       }
 
       // Confirmed/deprecated
-      if (req.confirmed_at) {
-        console.log(`  ${chalk.dim(String(req.confirmed_at).slice(0, 19))}  ${chalk.green('CONFIRMED')}`);
-      }
-      if (req.deprecated_at) {
-        console.log(`  ${chalk.dim(String(req.deprecated_at).slice(0, 19))}  ${chalk.red('DEPRECATED')}`);
+      if (req.confirmed_at) events.push({ at: String(req.confirmed_at), type: 'CONFIRMED', detail: '' });
+      if (req.deprecated_at) events.push({ at: String(req.deprecated_at), type: 'DEPRECATED', detail: '' });
+
+      // Sort by date
+      events.sort((a, b) => a.at.localeCompare(b.at));
+
+      for (const ev of events) {
+        const date = ev.at.slice(0, 19);
+        const colorFn = ev.type.includes('ACCEPT') || ev.type === 'CONFIRMED' ? chalk.green
+          : ev.type.includes('REJECT') || ev.type === 'DEPRECATED' ? chalk.red
+          : ev.type === 'CHANGED' ? chalk.yellow
+          : chalk.blue;
+        const by = ev.by ? chalk.dim(` by ${ev.by}`) : '';
+        console.log(`  ${chalk.dim(date)}  ${colorFn(ev.type.padEnd(18))}  ${ev.detail}${by}`);
       }
 
       console.log();

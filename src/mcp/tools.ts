@@ -31,6 +31,7 @@ import { diagnoseSize, countLoc } from '../core/sizing.js';
 import { loadAgentDefs, saveAgentDef, type AgentDefinition } from '../agents/runner.js';
 import { minimatch } from '../utils/glob.js';
 import { parseGitLog, syncSpecs, type SyncResult } from '../commands/sync.js';
+import { getChangedFiles, reverseMap } from '../commands/verify.js';
 
 // =============================================
 // Types
@@ -297,6 +298,17 @@ export function getToolList(): ToolDef[] {
         },
       },
     },
+    {
+      name: 'fugue_verify',
+      description: 'Check regression risk — map changed files to REQs and check test coverage.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          since: { type: 'string', description: 'Check changes since this commit' },
+          path: { type: 'string', description: 'Project path (default: cwd)' },
+        },
+      },
+    },
   ];
 }
 
@@ -323,6 +335,7 @@ export async function handleRequest(name: string, args: Record<string, unknown>)
       case 'fugue_snapshot_scan': return handleSnapshotScan(args);
       case 'fugue_snapshot_save': return handleSnapshotSave(args);
       case 'fugue_sync': return handleSync(args);
+      case 'fugue_verify': return handleVerify(args);
       default:
         return errorResult(`Unknown tool: ${name}`);
     }
@@ -953,5 +966,34 @@ function handleSync(args: Record<string, unknown>): ToolResult {
     testRefsAdded: result.testRefsAdded,
     staleMarked: result.staleMarked,
     promotions: result.promotions,
+  });
+}
+
+function handleVerify(args: Record<string, unknown>): ToolResult {
+  const fugueDir = resolveFugueDir(args.path as string | undefined);
+  const specs = loadSpecs(fugueDir);
+  const since = args.since as string | undefined;
+
+  const hasAnyRefs = specs.some(s => (s.code_refs ?? []).length > 0);
+  if (!hasAnyRefs) {
+    return textResult({ error: 'No code_refs in any REQ. Run fugue sync first.' });
+  }
+
+  const changedFiles = getChangedFiles(since);
+  if (changedFiles.length === 0) {
+    return textResult({ changedFiles: 0, affected: 0 });
+  }
+
+  const results = reverseMap(specs, changedFiles);
+  return textResult({
+    changedFiles: changedFiles.length,
+    affected: results.length,
+    results: results.map(r => ({
+      reqId: r.reqId,
+      title: r.title,
+      testStatus: r.testStatus,
+      changedFiles: r.changedFiles,
+      testCount: r.testRefs.length,
+    })),
   });
 }

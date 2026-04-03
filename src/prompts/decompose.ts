@@ -49,8 +49,55 @@ export function buildDecomposeSystemPrompt(config?: FugueConfig): string {
   return prompt;
 }
 
-export function buildDecomposePrompt(docContent: string): string {
-  return `Extract requirements from this planning document:
+/**
+ * Detect document format (DCMP-001).
+ * Returns a hint string that gets injected into the prompt.
+ */
+export function detectDocFormat(content: string): { format: string; hint: string } {
+  const lines = content.split('\n');
+
+  // Lean Canvas detection (9-block structure)
+  const leanKeywords = ['문제', '고객', '솔루션', '가치제안', 'UVP', '채널', '수익', '비용', '핵심지표', '불공정우위'];
+  const leanHits = leanKeywords.filter(kw => content.includes(kw)).length;
+  if (leanHits >= 4) {
+    return {
+      format: 'lean-canvas',
+      hint: 'This is a Lean Canvas document. Extract requirements from each of the 9 blocks. Focus on Solution, UVP, and Key Metrics blocks for functional requirements.',
+    };
+  }
+
+  // Task checklist detection (- [ ] or - [x] patterns)
+  const checkboxLines = lines.filter(l => /^\s*-\s*\[[ x]\]/.test(l)).length;
+  if (checkboxLines >= 3) {
+    return {
+      format: 'task-checklist',
+      hint: 'This is a task checklist. Each checked/unchecked item may represent a requirement. Group related items and extract atomic requirements.',
+    };
+  }
+
+  // Milestone/phase document
+  const milestoneKeywords = ['M1', 'M2', 'M3', 'Phase', 'Sprint', '마일스톤', '단계'];
+  const milestoneHits = milestoneKeywords.filter(kw => content.includes(kw)).length;
+  if (milestoneHits >= 2) {
+    return {
+      format: 'milestone',
+      hint: 'This is a milestone/phase document. Extract requirements per milestone. Tag each requirement with source_section indicating which milestone it belongs to.',
+    };
+  }
+
+  // Default: standard markdown
+  return {
+    format: 'markdown',
+    hint: 'This is a standard markdown document. Extract requirements from each heading section.',
+  };
+}
+
+export function buildDecomposePrompt(docContent: string, opts?: { dryRun?: boolean; existingReqIds?: string[] }): string {
+  const { format, hint } = detectDocFormat(docContent);
+
+  let prompt = `Extract requirements from this planning document.
+Document format detected: ${format}
+${hint}
 
 ---
 ${docContent}
@@ -58,4 +105,11 @@ ${docContent}
 
 Return a JSON array:
 [{"id": "REQ-001", "title": "...", "priority": "HIGH", "description": "...", "source_section": "..."}]`;
+
+  // DCMP-004: warn about existing REQs
+  if (opts?.existingReqIds && opts.existingReqIds.length > 0) {
+    prompt += `\n\nIMPORTANT: The following REQ IDs already exist as CONFIRMED. Do NOT generate duplicates:\n${opts.existingReqIds.join(', ')}`;
+  }
+
+  return prompt;
 }
