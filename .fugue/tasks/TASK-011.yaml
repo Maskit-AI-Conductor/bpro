@@ -43,5 +43,10 @@ req_ids:
   - REQ-DCMP-002
   - REQ-DCMP-003
   - REQ-DCMP-004
+  - REQ-TRAC-016
+  - REQ-AGNT-010
+  - REQ-AGNT-011
+  - REQ-AGNT-012
+  - REQ-AGNT-013
 escalations: []
 plan_file: plans/TASK-011_11-traceability-and-change-mgmt_2026-04-02T23-29-38.md
