@@ -73,6 +73,23 @@ export const BUILTIN_WORKFLOWS: WorkflowDef[] = [
       { action: 'report', type: 'auto', description: 'Generate report' },
     ],
   },
+  {
+    name: 'pm-daily',
+    description: 'PM daily check — status + blockers + Progressive Detail promotions',
+    steps: [
+      { action: 'status', type: 'auto', description: 'Show project status and REQ progress' },
+      { action: 'audit --quick', type: 'auto', description: 'Quick audit for blockers and gaps' },
+      { action: 'sync --dry-run', type: 'auto', description: 'Check pending sync and promotion suggestions' },
+    ],
+  },
+  {
+    name: 'pm-review',
+    description: 'PM review cycle — review DRAFT REQs and confirm',
+    steps: [
+      { action: 'plan review', type: 'gate', description: 'Review DRAFT REQs one by one' },
+      { action: 'plan confirm', type: 'manual', description: 'Confirm accepted REQs' },
+    ],
+  },
 ];
 
 // =============================================

@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { requireFugueDir, loadConfig, loadModels } from '../core/project.js';
 import { loadAgentDefs, readAgentLogs, listLoggedAgents } from '../agents/runner.js';
-import { printError, printInfo, printWarning } from '../utils/display.js';
+import { printError, printInfo, printWarning, printSuccess } from '../utils/display.js';
 
 export const agentCommand = new Command('agent')
   .description('Manage and inspect agents');
@@ -175,5 +175,48 @@ agentCommand
     } catch (err: unknown) {
       printError(err instanceof Error ? err.message : String(err));
       process.exit(1);
+    }
+  });
+
+// --- agent guide (PMIF-003) ---
+
+agentCommand
+  .command('guide')
+  .description('Generate MCP usage guide for a specific role')
+  .requiredOption('--role <role>', 'Role: pm, dev, qa')
+  .action(async (opts: { role: string }) => {
+    const role = opts.role.toLowerCase();
+    if (role === 'pm') {
+      console.log('# Fugue MCP Usage Guide — PM Role\n');
+      console.log('## Daily Routine\n');
+      console.log('### 1. Morning Check (pm-daily workflow)');
+      console.log('    fugue workflow run pm-daily');
+      console.log('Shows: project status, quick audit, sync promotions.\n');
+      console.log('### 2. Weekly Sync');
+      console.log('    fugue sync');
+      console.log('Maps commits with REQ-IDs to code_refs/test_refs.\n');
+      console.log('### 3. Feature Completion Check');
+      console.log('    fugue verify --since <last-release>');
+      console.log('Shows which REQs were affected and whether tests exist.\n');
+      console.log('## MCP Tools\n');
+      console.log('  fugue_status    — project progress overview');
+      console.log('  fugue_audit     — quality check');
+      console.log('  fugue_sync      — sync commits to traceability matrix');
+      console.log('  fugue_get_specs — list REQs with filters');
+      console.log('  fugue_task_list — list tasks');
+      console.log('  fugue_feedback  — accept/reject/comment on REQ');
+      console.log('  fugue_confirm   — confirm accepted REQs\n');
+      console.log('## Progressive Detail Levels\n');
+      console.log('  L0: Commit tag only     → no action');
+      console.log('  L1: REQ with desc       → review in pm-review');
+      console.log('  L2: ai_context auto     → review summary, edit if needed');
+      console.log('  L3: Policy generated    → review and confirm\n');
+      console.log('On sync promotion suggestion:');
+      console.log('  fugue enrich <REQ-ID>          → accept L2');
+      console.log('  fugue policy generate <REQ-ID> → accept L3');
+      console.log('  (or ignore to dismiss)\n');
+      printSuccess('PM guide generated.');
+    } else {
+      printWarning(`Role '${role}' guide not yet available. Supported: pm`);
     }
   });

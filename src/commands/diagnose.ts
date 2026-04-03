@@ -252,3 +252,186 @@ export const deliverCommand = new Command('deliver')
       process.exit(1);
     }
   });
+
+// =============================================
+// Agent gap analysis (AGNT-010~012)
+// =============================================
+
+diagnoseCommand
+  .command('agents')
+  .description('Analyze agent gaps — recommend missing agents based on REQ domains')
+  .action(async () => {
+    try {
+      const fugueDir = requireFugueDir();
+      const root = path.dirname(fugueDir);
+      const reqs = loadSpecs(fugueDir);
+      const agents = await loadAgentDefs(fugueDir);
+
+      // Collect domains from REQ IDs
+      const domainReqs = new Map<string, number>();
+      for (const req of reqs) {
+        const match = req.id.match(/^REQ-([A-Z]+)-/);
+        if (match) {
+          const domain = match[1];
+          domainReqs.set(domain, (domainReqs.get(domain) ?? 0) + 1);
+        }
+      }
+
+      // Check .claude/agents/ for existing agent prompts
+      const claudeAgentsDir = path.join(root, '.claude', 'agents');
+      const existingPrompts = fs.existsSync(claudeAgentsDir)
+        ? fs.readdirSync(claudeAgentsDir).filter(f => f.endsWith('.md')).map(f => f.replace('.md', ''))
+        : [];
+
+      // Check CLAUDE.md existence
+      const hasClaudeMd = fs.existsSync(path.join(root, 'CLAUDE.md'));
+
+      console.log();
+      console.log(`  ${chalk.bold('Agent Gap Analysis')}`);
+      console.log(`  ${chalk.dim('-'.repeat(60))}`);
+      console.log();
+
+      // CLAUDE.md check (AGNT-013)
+      if (!hasClaudeMd) {
+        console.log(`  ${chalk.yellow('⚠')} CLAUDE.md not found.`);
+        console.log(`    ${chalk.dim('Run fugue diagnose scaffold to generate one.')}`);
+        console.log();
+      } else {
+        console.log(`  ${chalk.green('✓')} CLAUDE.md exists`);
+      }
+
+      // Domain → recommended agent role mapping
+      const roleMap: Record<string, string> = {
+        AUTH: 'auth-dev', API: 'api-dev', UI: 'ui-dev', WIDGET: 'widget-dev',
+        BO: 'backoffice-dev', CHAT: 'chat-dev', AI: 'ai-dev', DB: 'db-dev',
+        CORE: 'tech-lead', TRAC: 'pm', PDET: 'pm', PMIF: 'pm',
+        VRFY: 'qa', DCMP: 'pm', AGNT: 'tech-lead',
+      };
+
+      console.log(`  ${chalk.bold('Domain Coverage')}`);
+      console.log();
+
+      const recommendations: Array<{ domain: string; role: string; reqCount: number }> = [];
+
+      for (const [domain, count] of [...domainReqs.entries()].sort((a, b) => b[1] - a[1])) {
+        const suggestedRole = roleMap[domain] ?? `${domain.toLowerCase()}-dev`;
+        const hasAgent = existingPrompts.some(p =>
+          p.toLowerCase().includes(domain.toLowerCase()) || p.toLowerCase().includes(suggestedRole),
+        ) || agents.some(a => a.scope?.includes(domain));
+
+        const status = hasAgent ? chalk.green('✓') : chalk.yellow('⚠');
+        const roleHint = hasAgent ? '' : chalk.dim(` → recommend: ${suggestedRole}`);
+        console.log(`  ${status} ${domain.padEnd(8)} ${String(count).padEnd(4)} REQs${roleHint}`);
+
+        if (!hasAgent && count >= 3) {
+          recommendations.push({ domain, role: suggestedRole, reqCount: count });
+        }
+      }
+
+      if (recommendations.length > 0) {
+        console.log();
+        printInfo(`${recommendations.length} agent(s) recommended:`);
+        for (const r of recommendations) {
+          console.log(`  ${chalk.cyan(r.role)} for ${r.domain} domain (${r.reqCount} REQs)`);
+        }
+        console.log(chalk.dim('\n  Agent prompt auto-generation will be available in a future release.'));
+      } else {
+        console.log();
+        printSuccess('All domains have agent coverage.');
+      }
+      console.log();
+    } catch (err: unknown) {
+      printError(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
+
+// =============================================
+// CLAUDE.md scaffold (AGNT-013)
+// =============================================
+
+diagnoseCommand
+  .command('scaffold')
+  .description('Generate CLAUDE.md scaffold from project structure')
+  .action(async () => {
+    try {
+      const fugueDir = requireFugueDir();
+      const root = path.dirname(fugueDir);
+      const config = loadConfig(fugueDir);
+
+      const claudeMdPath = path.join(root, 'CLAUDE.md');
+      if (fs.existsSync(claudeMdPath)) {
+        printWarning('CLAUDE.md already exists. Use --force to overwrite (not implemented yet).');
+        return;
+      }
+
+      // Detect project structure
+      const hasPkg = fs.existsSync(path.join(root, 'package.json'));
+      const hasPyproject = fs.existsSync(path.join(root, 'pyproject.toml'));
+      const hasTsconfig = fs.existsSync(path.join(root, 'tsconfig.json'));
+      const hasGoMod = fs.existsSync(path.join(root, 'go.mod'));
+
+      let buildCmd = '# TODO: add build command';
+      let devCmd = '# TODO: add dev command';
+      let testCmd = '# TODO: add test command';
+      let lang = 'Unknown';
+
+      if (hasPkg) {
+        const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
+        buildCmd = pkg.scripts?.build ? `npm run build` : buildCmd;
+        devCmd = pkg.scripts?.dev ? `npm run dev` : devCmd;
+        testCmd = pkg.scripts?.test ? `npm test` : testCmd;
+        lang = hasTsconfig ? 'TypeScript' : 'JavaScript';
+      } else if (hasPyproject) {
+        lang = 'Python';
+        buildCmd = 'pip install -e .';
+        testCmd = 'pytest';
+      } else if (hasGoMod) {
+        lang = 'Go';
+        buildCmd = 'go build ./...';
+        testCmd = 'go test ./...';
+      }
+
+      const scaffold = `# ${config.project_name || path.basename(root)}
+
+## Build & Development
+
+\`\`\`bash
+# Build
+${buildCmd}
+
+# Dev
+${devCmd}
+
+# Test
+${testCmd}
+\`\`\`
+
+## Architecture
+
+- Language: ${lang}
+- Project managed by Fugue (see .fugue/)
+
+## REQ Reference Rules
+
+- All commits should include REQ-ID in the message: \`feat: description (REQ-XXX-NNN)\`
+- \`fugue sync\` maps commits to traceability matrix
+- \`fugue verify\` checks test coverage for changed REQs
+
+## Agent Boundaries
+
+<!-- Define which agents own which directories -->
+<!-- Example:
+- api-dev: src/api/, src/services/
+- ui-dev: src/components/, src/pages/
+-->
+`;
+
+      fs.writeFileSync(claudeMdPath, scaffold, 'utf-8');
+      printSuccess(`CLAUDE.md generated at ${claudeMdPath}`);
+      printInfo('Edit the scaffold to match your project structure.');
+    } catch (err: unknown) {
+      printError(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  });
